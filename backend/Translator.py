@@ -5,7 +5,7 @@ from colorama import Fore
 from googletrans import Translator
 from PIL import ImageGrab
 import pytesseract
-from threading import Thread
+from threading import Thread, Lock
 from time import sleep
 
 
@@ -17,8 +17,9 @@ class Translator(object):
         self._outputText = []
         self._custom_conf = r'--psm 11'
         self._is_running = True
-        self._reader = Thread(target=self.screen_push)
-        self._writer = Thread(target=self.translator)
+        self._reader = Thread(target=self.get_image_routine)
+        self._writer = Thread(target=self.translator_routine)
+        self._imageLock = Lock()
         self._reader.start()
         self._writer.start()
 
@@ -27,12 +28,17 @@ class Translator(object):
         self._reader.join()
         self._writer.join()
 
-    def translator(self):
+    def translator_routine(self):
         while self._is_running:
-            if len(self._inputImage) == 0:
-                sleep(0)
-                continue
-            self.try_save_image(self._inputImage.pop(0))
+            with self._imageLock:
+                if len(self._inputImage) != 0:
+                    try:
+                        self.translate_image(
+                            self.crop_image(self._inputImage.pop(0)))
+                    except Exception as e:
+                        self._log.error(
+                            'Accured exception on translate image: {}'.format(e))
+            sleep(0)
 
     def translate_image(self, image):
         pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -46,25 +52,20 @@ class Translator(object):
         self._log.error(translate.text)
         self._outputText.append({'en': result, 'ru': translate.text})
 
-    def try_save_image(self, image):
-        try:
-            self._log.info('try_save_image')
-            cropped_image = image.crop((250, 770, 1600, 1000))
-            self.translate_image(cropped_image)
-        except Exception as e:
-            self._log.error('Ошибка при сохранении изображения:', e)
+    def crop_image(self, image):
+        return image.crop((250, 770, 1600, 1000))
 
-    def screen_push(self):
-        last_clipboard_image = None
+    def get_image_routine(self):
+        last_image = None
         while self._is_running:
-            self._log.info('thread 2')
             clipboard_image = ImageGrab.grabclipboard()
-            if clipboard_image is not None and clipboard_image != last_clipboard_image:
-                self.try_save_image(clipboard_image)
-                last_clipboard_image = clipboard_image
+            with self._imageLock:
+                if clipboard_image != None or last_image != clipboard_image:
+                    self._inputImage.push(clipboard_image)
+                    last_image = clipboard_image
             sleep(0.01)
 
     def getText(self):
         if len(self._outputText) == 0:
             return ""
-        return self._outputText.pop(0) 
+        return self._outputText.pop(0)
