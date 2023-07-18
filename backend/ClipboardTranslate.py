@@ -7,6 +7,7 @@ from Translator import Translator
 
 app = Flask(__name__)
 
+
 @app.route("/get_new_text")
 def hello():
     print('thread front', flush=True)
@@ -15,11 +16,13 @@ def hello():
         return texts.pop(0)
     return ""
 
+
 def getParameters():
     parser = argparse.ArgumentParser(
-                    prog='Clipboard Transate',
-                    description='Get screenshot from clipboard and translates it.')
-    parser.add_argument('-p', '--tesseract_path', default='C:\\Program Files\\Tesseract-OCR\\tesseract.exe')
+        prog='Clipboard Transate',
+        description='Get screenshot from clipboard and translates it.')
+    parser.add_argument('-p', '--tesseract_path',
+                        default='C:\\Program Files\\Tesseract-OCR\\tesseract.exe')
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', default=5000)
     args = parser.parse_args()

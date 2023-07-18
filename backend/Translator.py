@@ -17,7 +17,6 @@ class Translator(object):
         self._thread.start()
         self._is_running = True
 
-    
     def stop(self):
         self._is_running = False
         self._thread.join()
