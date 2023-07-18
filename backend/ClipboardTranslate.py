@@ -7,7 +7,7 @@ import logging
 from Translator import Translator
 
 app = Flask(__name__)
-log = logging.Logger()
+log = logging.Logger('main')
 
 
 @app.route("/get_new_text")
