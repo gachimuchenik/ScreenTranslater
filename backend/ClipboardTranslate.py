@@ -25,6 +25,10 @@ def getParameters():
                         default='C:\\Program Files\\Tesseract-OCR\\tesseract.exe')
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', default=5000)
+    parser.add_argument('--x1', default=250)
+    parser.add_argument('--y1', default=770)
+    parser.add_argument('--x2', default=1600)
+    parser.add_argument('--y2', default=1000)
     args = parser.parse_args()
     log.info('running with: tesseract_path={},\nhost={}\nport={}'.format(
         args.tesseract_path, args.host, args.port))

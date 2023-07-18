@@ -10,9 +10,12 @@ from time import sleep
 
 
 class Translator(object):
-    def __init__(self, logger, tesseract_path='heuasodjaosdj'):
+    def __init__(self, logger, config):
+        # config:
+        # tesseract_path = 'path to tesseract.exe', str
+        # x1, x2, y1, y2: text coorinates, int
+        self._config = config
         self._log = logger
-        self._tesseract_path = tesseract_path
         self._inputImage = []
         self._outputText = []
         self._custom_conf = r'--psm 11'
@@ -41,7 +44,7 @@ class Translator(object):
             sleep(0)
 
     def translate_image(self, image):
-        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
         result = pytesseract.image_to_string(
             image, config=self._custom_conf, output_type='string')
         result = result.replace('\n', ' ')
@@ -53,7 +56,7 @@ class Translator(object):
         self._outputText.append({'en': result, 'ru': translate.text})
 
     def crop_image(self, image):
-        return image.crop((250, 770, 1600, 1000))
+        return image.crop((self._config.x1, self._config.y1, self._config.x2, self._config.y2))
 
     def get_image_routine(self):
         last_image = None
