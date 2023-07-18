@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>DIMAN</title>
+    <link rel="stylesheet" href="index.css" />
+    <script>
+    fetch("http://127.0.0.1:5000/");
+
+    async function updateTexts() {
+      const response = await fetch("http://127.0.0.1:5000/get_new_text");
+      const newText = await response.text();
+
+      if (newText) {
+        const newDiv = document.createElement('div');
+        newDiv.innerText = newText;
+        document.body.prepend(newDiv);
+      }
+
+      setTimeout(updateTexts, 1000)
+    }
+
+    updateTexts();
+    </script>
+    <style>
+    html, body {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      background-color: #111112;
+    }
+    div {
+      margin: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      background-color: #323234;
+      color: white;
+      font-size: 22px;
+
+    }
+    </style>
+  </head>
+  <body>
+  </body>
+</html>
