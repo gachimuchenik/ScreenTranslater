@@ -2,19 +2,18 @@
 
 from flask import Flask
 import argparse
+import logging
 
 from Translator import Translator
 
 app = Flask(__name__)
+log = logging.Logger()
 
 
 @app.route("/get_new_text")
 def hello():
-    print('thread front', flush=True)
-    global texts
-    if len(texts) > 0:
-        return texts.pop(0)
-    return ""
+    log.info('thread front')
+    return app.config['translator'].getText()
 
 
 def getParameters():
@@ -26,14 +25,18 @@ def getParameters():
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', default=5000)
     args = parser.parse_args()
+    log.info('running with: tesseract_path={},\nhost={}\nport={}'.format(
+        args.tesseract_path, args.host, args.port))
     return args
 
 
 def main():
     args = getParameters()
-    translator = Translator(args.tesseract_path)
+    translator = Translator(log, args.tesseract_path)
 
+    app.config['translator'] = translator
     app.run(host=args.host, port=args.port, debug=True, threaded=True)
+
     translator.stop()
 
 
