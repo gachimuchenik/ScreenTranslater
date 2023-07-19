@@ -12,6 +12,8 @@ class Config(object):
         self.coordinates = [int(x) for x in config.get('Translator', 'coordinates').split(',')]
         self.host = config.get('Network', 'host')
         self.port = config.getint('Network', 'port')
+        self.log_path = config.get('System', 'log_path')
+        self.empty_log_on_start = config.getboolean('System', 'empty_log_on_start')
     
     def to_dict(self):
         d={}

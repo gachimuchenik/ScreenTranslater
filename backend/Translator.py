@@ -72,7 +72,11 @@ class Translator(object):
     def get_image_routine(self):
         last_image = None
         while self._is_running:
-            clipboard_image = ImageGrab.grabclipboard()
+            clipboard_image = None
+            try:
+                clipboard_image = ImageGrab.grabclipboard()
+            except Exception as e:
+                self._log.error('Accured exception: {}'.format(e))
             with self._imageLock:
                 if clipboard_image != None and last_image != clipboard_image:
                     self._inputImage.append(clipboard_image)

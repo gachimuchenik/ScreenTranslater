@@ -8,11 +8,11 @@ import sys
 
 from Translator import Translator
 from Config import Config
+from utils import make_logger
 
 app = Flask(__name__)
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-log = logging.getLogger()
+log = None
 
 
 @app.route("/get_new_text")
@@ -30,12 +30,14 @@ def getParameters():
     args = parser.parse_args()
     config = Config(args.config_path)
 
-    log.info('running with: {}'.format(config.to_dict()))
     return config
 
 
 def main():
     config = getParameters()
+    log = make_logger(config)
+    log.info('==========Started==========\nparams={}'.format(config.to_dict()))
+
     app.config['translator'] = Translator(log, config)
     app.run(host=config.host, port=config.port, debug=True, use_reloader=False)
     app.config['translator'].stop()

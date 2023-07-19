@@ -9,8 +9,9 @@ from PIL import Image
 from time import sleep
 from Config import Config
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-log = logging.getLogger()
+from utils import make_logger
+
+log = None
 
 
 def getParameters():
@@ -21,19 +22,22 @@ def getParameters():
 
     args = parser.parse_args()
     config = Config(args.config_path)
-    log.info('running with: args={}, config={}'.format(args, config))
+
     return (config, args.input)
 
 
 def main():
     (config, input_image) = getParameters()
+    log = make_logger(config)
+    log.info('==========Started==========\ninput_image={}, config={}'.format(input_image, config.to_dict()))
+
     translator = Translator(log, config)
 
     image = Image.open(input_image)
     translator.push_image(image)
     while translator.getCounter() == 0:
         sleep(0.1)
-    log.info(translator.getText())
+    log.info('result={}'.format(translator.getText()))
 
     translator.stop()
 
