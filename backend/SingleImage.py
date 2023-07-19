@@ -5,6 +5,7 @@ from Translator import Translator
 import os
 import argparse
 import logging
+from PIL import Image
 
 log = logging.Logger('main')
 
@@ -28,9 +29,9 @@ def main():
     args = getParameters()
     translator = Translator(log, args)
 
-    with open(args.input, 'rb') as f:
-        image = f.read()
-        translator.push_image(image)
+    image = Image.open(args.input)
+    translator.push_image(image)
+    log.info(translator.getText())
 
     translator.stop()
 
