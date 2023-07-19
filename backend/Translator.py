@@ -7,6 +7,8 @@ from PIL import ImageGrab
 import pytesseract
 from threading import Thread, Lock
 from time import sleep
+import time
+
 
 
 class Translator(object):
@@ -33,19 +35,24 @@ class Translator(object):
         self._writer.join()
 
     def translator_routine(self):
+        self._counter = 0
         while self._is_running:
+            image = None
             with self._imageLock:
                 if len(self._inputImage) != 0:
-                    try:
-                        self.translate_image(
-                            self.to_grayscale_image(
-                            self.crop_image(self._inputImage.pop(0))))
-                    except Exception as e:
-                        self._log.info(
-                            'Accured exception on translate image: {}'.format(e))
+                    image = self._inputImage.pop(0)
+            if image:
+                try:
+                    self.translate_image(self.to_grayscale_image(self.crop_image(image)))
+                except Exception as e:
+                    self._log.error('Accured exception on translate image: {}'.format(e))
+                finally:
+                    self._counter += 1
+                    image = None
             sleep(0.1)
 
     def translate_image(self, image):
+        start = time.time()
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
         result = pytesseract.image_to_string(
             image, config=self._custom_conf, output_type='string')
@@ -53,9 +60,11 @@ class Translator(object):
         translate = self._translator.translate(result, dest='ru')
         self._log.info('--en--\n{}\n--ru--\n{}'.format(result, translate.text))
         self._outputText.append({'en': result, 'ru': translate.text})
+        end = time.time()
+        self._log.error(f'{round(end - start, 2)} second')
 
     def crop_image(self, image):
-        return image.crop((self._config.x1, self._config.y1, self._config.x2, self._config.y2))
+        return image.crop(self._config.coordinates)
 
     def to_grayscale_image(self, image):
         grayscale_threshold = 220
@@ -64,7 +73,11 @@ class Translator(object):
     def get_image_routine(self):
         last_image = None
         while self._is_running:
-            clipboard_image = ImageGrab.grabclipboard()
+            clipboard_image = None
+            try:
+                clipboard_image = ImageGrab.grabclipboard()
+            except Exception as e:
+                self._log.error('Accured exception: {}'.format(e))
             with self._imageLock:
                 if clipboard_image != None and last_image != clipboard_image:
                     self._inputImage.append(clipboard_image)
@@ -80,3 +93,6 @@ class Translator(object):
         # test purpuses only
         with self._imageLock:
             self._inputImage.append(image)
+
+    def getCounter(self):
+        return self._counter

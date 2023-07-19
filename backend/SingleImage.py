@@ -6,33 +6,38 @@ import sys
 import argparse
 import logging
 from PIL import Image
+from time import sleep
+from Config import Config
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-log = logging.getLogger()
+from utils import make_logger
+
+log = None
 
 
 def getParameters():
-    parser = argparse.ArgumentParser(
-        prog='Translate single image')
+    parser = argparse.ArgumentParser(prog='Translate single image')
+
     parser.add_argument('input')
-    parser.add_argument('-p', '--tesseract_path', default='C:\\Program Files\\Tesseract-OCR\\tesseract.exe')
-    parser.add_argument('--x1', default=250)
-    parser.add_argument('--y1', default=770)
-    parser.add_argument('--x2', default=1600)
-    parser.add_argument('--y2', default=1000)
+    parser.add_argument('-c', '--config-path', default = 'config.ini')
+
     args = parser.parse_args()
-    log.info('running with: args={}'.format(
-        args))
-    return args
+    config = Config(args.config_path)
+
+    return (config, args.input)
 
 
 def main():
-    args = getParameters()
-    translator = Translator(log, args)
+    (config, input_image) = getParameters()
+    log = make_logger(config)
+    log.info('==========Started==========\ninput_image={}, config={}'.format(input_image, config.to_dict()))
 
-    image = Image.open(args.input)
+    translator = Translator(log, config)
+
+    image = Image.open(input_image)
     translator.push_image(image)
-    log.info(translator.getText())
+    while translator.getCounter() == 0:
+        sleep(0.1)
+    log.info('result={}'.format(translator.getText()))
 
     translator.stop()
 
