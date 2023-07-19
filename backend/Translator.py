@@ -42,7 +42,7 @@ class Translator(object):
                     except Exception as e:
                         self._log.error(
                             'Accured exception on translate image: {}'.format(e))
-            sleep(0)
+            sleep(0.1)
 
     def translate_image(self, image):
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
@@ -64,10 +64,10 @@ class Translator(object):
         while self._is_running:
             clipboard_image = ImageGrab.grabclipboard()
             with self._imageLock:
-                if clipboard_image != None or last_image != clipboard_image:
-                    self._inputImage.push(clipboard_image)
+                if clipboard_image != None and last_image != clipboard_image:
+                    self._inputImage.append(clipboard_image)
                     last_image = clipboard_image
-            sleep(0.01)
+            sleep(0.1)
 
     def getText(self):
         if len(self._outputText) == 0:

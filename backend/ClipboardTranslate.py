@@ -40,12 +40,9 @@ def getParameters():
 
 def main():
     args = getParameters()
-    translator = Translator(log, args)
-
-    app.config['translator'] = translator
-    app.run(host=args.host, port=args.port, debug=True, threaded=True)
-
-    translator.stop()
+    app.config['translator'] = Translator(log, args)
+    app.run(host=args.host, port=args.port, debug=True, use_reloader=False)
+    app.config['translator'].stop()
 
 
 if __name__ == '__main__':
