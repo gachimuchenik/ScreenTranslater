@@ -35,15 +35,20 @@ class Translator(object):
         self._writer.join()
 
     def translator_routine(self):
+        self._counter = 0
         while self._is_running:
+            image = None
             with self._imageLock:
                 if len(self._inputImage) != 0:
-                    try:
-                        self.translate_image(
-                            self.crop_image(self._inputImage.pop(0)))
-                    except Exception as e:
-                        self._log.error(
-                            'Accured exception on translate image: {}'.format(e))
+                    image = self._inputImage.pop(0)
+            if image:
+                try:
+                    self.translate_image(self.crop_image(image))
+                except Exception as e:
+                    self._log.error('Accured exception on translate image: {}'.format(e))
+                finally:
+                    self._counter += 1
+                    image = None
             sleep(0.1)
 
     def translate_image(self, image):
@@ -83,3 +88,6 @@ class Translator(object):
         # test purpuses only
         with self._imageLock:
             self._inputImage.append(image)
+
+    def getCounter(self):
+        return self._counter

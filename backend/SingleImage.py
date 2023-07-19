@@ -31,7 +31,8 @@ def main():
 
     image = Image.open(input_image)
     translator.push_image(image)
-    sleep(2)
+    while translator.getCounter() == 0:
+        sleep(0.1)
     log.info(translator.getText())
 
     translator.stop()
