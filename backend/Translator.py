@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from colorama import Fore
-from googletrans import Translator
+from googletrans import Translator as GoogleTranslator
 from PIL import ImageGrab
 import pytesseract
 from threading import Thread, Lock
@@ -19,6 +19,7 @@ class Translator(object):
         self._inputImage = []
         self._outputText = []
         self._custom_conf = r'--psm 11'
+        self._translator = GoogleTranslator()
         self._is_running = True
         self._reader = Thread(target=self.get_image_routine)
         self._writer = Thread(target=self.translator_routine)
@@ -72,3 +73,8 @@ class Translator(object):
         if len(self._outputText) == 0:
             return ""
         return self._outputText.pop(0)
+    
+    def push_image(self, image):
+        # test purpuses only
+        with self._imageLock:
+            self._inputImage.append(image)

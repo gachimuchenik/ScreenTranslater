@@ -37,7 +37,7 @@ def getParameters():
 
 def main():
     args = getParameters()
-    translator = Translator(log, args.tesseract_path)
+    translator = Translator(log, args)
 
     app.config['translator'] = translator
     app.run(host=args.host, port=args.port, debug=True, threaded=True)
