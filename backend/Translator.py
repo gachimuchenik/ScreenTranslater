@@ -10,6 +10,7 @@ from time import sleep
 import time
 
 
+
 class Translator(object):
     def __init__(self, logger, config):
         # config:
@@ -47,7 +48,7 @@ class Translator(object):
 
     def translate_image(self, image):
         start = time.time()
-        pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
+        pytesseract.pytesseract.tesseract_cmd = self._config.get('tesseract_path', 'default')
         result = pytesseract.image_to_string(
             image, config=self._custom_conf, output_type='string')
         result = result.replace('\n', ' ')
@@ -61,7 +62,12 @@ class Translator(object):
         self._log.error(f'{round(end - start, 2)} second')
 
     def crop_image(self, image):
-        return image.crop((self._config.x1, self._config.y1, self._config.x2, self._config.y2))
+        return image.crop((
+            self._config.get('x1', 'default'),
+            self._config.get('y1', 'default'),
+            self._config.get('x2', 'default'),
+            self._config.get('y2', 'default')
+        ))
 
     def get_image_routine(self):
         last_image = None
