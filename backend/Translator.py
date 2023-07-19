@@ -7,6 +7,7 @@ from PIL import ImageGrab
 import pytesseract
 from threading import Thread, Lock
 from time import sleep
+import time
 
 
 class Translator(object):
@@ -45,6 +46,7 @@ class Translator(object):
             sleep(0.1)
 
     def translate_image(self, image):
+        start = time.time()
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
         result = pytesseract.image_to_string(
             image, config=self._custom_conf, output_type='string')
@@ -55,6 +57,8 @@ class Translator(object):
         self._log.error('--ru--')
         self._log.error(translate.text)
         self._outputText.append({'en': result, 'ru': translate.text})
+        end = time.time()
+        self._log.error(f'{round(end - start, 2)} second')
 
     def crop_image(self, image):
         return image.crop((self._config.x1, self._config.y1, self._config.x2, self._config.y2))
