@@ -6,9 +6,9 @@ import argparse
 import logging
 import sys
 
-from Translator import Translator
-from Config import Config
-from utils import make_logger
+from lib.translator import Translator
+from lib.config import Config
+from lib.utils import make_logger
 
 app = Flask(__name__)
 

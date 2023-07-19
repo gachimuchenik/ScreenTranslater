@@ -9,8 +9,6 @@ from threading import Thread, Lock
 from time import sleep
 import time
 
-
-
 class Translator(object):
     def __init__(self, logger, config):
         # config:

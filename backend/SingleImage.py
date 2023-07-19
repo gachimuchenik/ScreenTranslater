@@ -1,15 +1,15 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-from Translator import Translator
+from lib.translator import Translator
 import sys
 import argparse
 import logging
 from PIL import Image
 from time import sleep
-from Config import Config
+from lib.config import Config
 
-from utils import make_logger
+from lib.utils import make_logger
 
 log = None
 
