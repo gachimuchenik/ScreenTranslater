@@ -3,11 +3,13 @@
 
 from colorama import Fore
 from googletrans import Translator as GoogleTranslator
-from PIL import ImageGrab
 import pytesseract
 from threading import Thread, Lock
 from time import sleep
 import time
+
+from image_getter import ImageGetter
+
 
 class Translator(object):
     def __init__(self, logger, config):
@@ -26,6 +28,7 @@ class Translator(object):
         self._imageLock = Lock()
         self._reader.start()
         self._writer.start()
+        self._image_getter = ImageGetter()
 
     def stop(self):
         self._is_running = False
@@ -41,9 +44,11 @@ class Translator(object):
                     image = self._inputImage.pop(0)
             if image:
                 try:
-                    self.translate_image(self.to_grayscale_image(self.crop_image(image)))
+                    self.translate_image(
+                        self.to_grayscale_image(self.crop_image(image)))
                 except Exception as e:
-                    self._log.error('Accured exception on translate image: {}'.format(e))
+                    self._log.error(
+                        'Accured exception on translate image: {}'.format(e))
                 finally:
                     self._counter += 1
                     image = None
@@ -66,27 +71,24 @@ class Translator(object):
 
     def to_grayscale_image(self, image):
         grayscale_threshold = 220
-        return image.convert('L').point(lambda x : 255 if x > grayscale_threshold else 0).convert('RGB')
+        return image.convert('L').point(lambda x: 255 if x > grayscale_threshold else 0).convert('RGB')
 
     def get_image_routine(self):
-        last_image = None
         while self._is_running:
-            clipboard_image = None
+            image = None
             try:
-                clipboard_image = ImageGrab.grabclipboard()
+                image = self._image_getter.get_last_image()
             except Exception as e:
                 self._log.error('Accured exception: {}'.format(e))
-            with self._imageLock:
-                if clipboard_image != None and last_image != clipboard_image:
-                    self._inputImage.append(clipboard_image)
-                    last_image = clipboard_image
+            if image:
+                self._inputImage.append(image)
             sleep(0.1)
 
     def getText(self):
         if len(self._outputText) == 0:
             return ""
         return self._outputText.pop(0)
-    
+
     def push_image(self, image):
         # test purpuses only
         with self._imageLock:
