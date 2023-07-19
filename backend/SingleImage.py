@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 
 from Translator import Translator
-import os
+import sys
 import argparse
 import logging
 from PIL import Image
 
-log = logging.Logger('main')
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+log = logging.getLogger()
 
 
 def getParameters():

@@ -4,11 +4,14 @@
 from flask import Flask
 import argparse
 import logging
+import sys
 
 from Translator import Translator
 
 app = Flask(__name__)
-log = logging.Logger('main')
+
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+log = logging.getLogger()
 
 
 @app.route("/get_new_text")
