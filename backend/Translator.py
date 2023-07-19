@@ -43,7 +43,7 @@ class Translator(object):
                     image = self._inputImage.pop(0)
             if image:
                 try:
-                    self.translate_image(self.crop_image(image))
+                    self.translate_image(self.to_grayscale_image(self.crop_image(image)))
                 except Exception as e:
                     self._log.error('Accured exception on translate image: {}'.format(e))
                 finally:
@@ -57,17 +57,18 @@ class Translator(object):
         result = pytesseract.image_to_string(
             image, config=self._custom_conf, output_type='string')
         result = result.replace('\n', ' ')
-        self._log.error('--en--')
-        self._log.error(result)
         translate = self._translator.translate(result, dest='ru')
-        self._log.error('--ru--')
-        self._log.error(translate.text)
+        self._log.info('--en--\n{}\n--ru--\n{}'.format(result, translate.text))
         self._outputText.append({'en': result, 'ru': translate.text})
         end = time.time()
         self._log.error(f'{round(end - start, 2)} second')
 
     def crop_image(self, image):
         return image.crop(self._config.coordinates)
+
+    def to_grayscale_image(self, image):
+        grayscale_threshold = 220
+        return image.convert('L').point(lambda x : 255 if x > grayscale_threshold else 0).convert('RGB')
 
     def get_image_routine(self):
         last_image = None
