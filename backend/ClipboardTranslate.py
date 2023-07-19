@@ -7,6 +7,7 @@ import logging
 import sys
 
 from Translator import Translator
+from Config import Config
 
 app = Flask(__name__)
 
@@ -24,24 +25,19 @@ def getParameters():
     parser = argparse.ArgumentParser(
         prog='Clipboard Transate',
         description='Get screenshot from clipboard and translates it.')
-    parser.add_argument('-p', '--tesseract_path',
-                        default='C:\\Program Files\\Tesseract-OCR\\tesseract.exe')
-    parser.add_argument('--host', default='127.0.0.1')
-    parser.add_argument('--port', default=5000)
-    parser.add_argument('--x1', default=250)
-    parser.add_argument('--y1', default=770)
-    parser.add_argument('--x2', default=1600)
-    parser.add_argument('--y2', default=1000)
+
+    parser.add_argument('-c', '--config-path', default='config.ini')
     args = parser.parse_args()
-    log.info('running with: tesseract_path={},\nhost={}\nport={}'.format(
-        args.tesseract_path, args.host, args.port))
-    return args
+    config = Config(args.config_path)
+
+    log.info('running with: {}'.format(config.to_dict()))
+    return config
 
 
 def main():
-    args = getParameters()
-    app.config['translator'] = Translator(log, args)
-    app.run(host=args.host, port=args.port, debug=True, use_reloader=False)
+    config = getParameters()
+    app.config['translator'] = Translator(log, config)
+    app.run(host=config.host, port=config.port, debug=True, use_reloader=False)
     app.config['translator'].stop()
 
 

@@ -7,34 +7,29 @@ import argparse
 import logging
 from PIL import Image
 from time import sleep
-import configparser
+from Config import Config
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 log = logging.getLogger()
 
 
 def getParameters():
-    parser = argparse.ArgumentParser(
-        prog='Translate single image')
+    parser = argparse.ArgumentParser(prog='Translate single image')
+
     parser.add_argument('input')
-    # parser.add_argument('-p', '--tesseract_path', default='D:\\Tesseract\\tesseract.exe')
-    # parser.add_argument('--x1', default=250)
-    # parser.add_argument('--y1', default=770)
-    # parser.add_argument('--x2', default=1600)
-    # parser.add_argument('--y2', default=1000)
-    config = configparser.ConfigParser()
-    config.read('config.ini')
+    parser.add_argument('-c', '--config-path', default = 'config.ini')
+
     args = parser.parse_args()
-    log.info('running with: args={}'.format(
-        args))
-    return args
+    config = Config(args.config_path)
+    log.info('running with: args={}, config={}'.format(args, config))
+    return (config, args.input)
 
 
 def main():
-    args = getParameters()
-    translator = Translator(log, args)
+    (config, input_image) = getParameters()
+    translator = Translator(log, config)
 
-    image = Image.open(args.input)
+    image = Image.open(input_image)
     translator.push_image(image)
     sleep(2)
     log.info(translator.getText())
