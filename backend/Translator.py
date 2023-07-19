@@ -38,7 +38,8 @@ class Translator(object):
                 if len(self._inputImage) != 0:
                     try:
                         self.translate_image(
-                            self.crop_image(self._inputImage.pop(0)))
+                            self.to_grayscale_image(
+                            self.crop_image(self._inputImage.pop(0))))
                     except Exception as e:
                         self._log.error(
                             'Accured exception on translate image: {}'.format(e))
@@ -58,6 +59,10 @@ class Translator(object):
 
     def crop_image(self, image):
         return image.crop((self._config.x1, self._config.y1, self._config.x2, self._config.y2))
+
+    def to_grayscale_image(self, image):
+        grayscale_threshold = 220
+        return image.convert('L').point(lambda x : 255 if x > grayscale_threshold else 0).convert('RGB')
 
     def get_image_routine(self):
         last_image = None
