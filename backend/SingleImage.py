@@ -8,10 +8,7 @@ from time import sleep
 from PIL import Image
 
 from lib.config import Config
-from lib.image_getter import ImageGetter
-from lib.image_translater import ImageTranslater
-from lib.processor import Processor
-from lib.utils import make_logger
+from lib.utils import make_logger, make_image_processor
 
 log = None
 
@@ -34,8 +31,7 @@ def main():
     log.info('==========Started==========\ninput_image={}, config={}'.format(
         input_image, config.to_dict()))
 
-    translator = Processor(log, config, ImageGetter(config.use_fake_image_getter),
-                           ImageTranslater(log, config))
+    translator = make_image_processor(config, log)
 
     image = Image.open(input_image)
     translator.push_data(image)

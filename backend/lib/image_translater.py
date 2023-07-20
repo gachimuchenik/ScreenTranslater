@@ -24,8 +24,8 @@ class ImageTranslater(object):
             self._log.info(
                 f'Image processed: {result}, elapsed: {int((end - start) * 1000)}ms')
         except Exception as e:
-            self._log.error(
-                'Accured exception on translate image: {}'.format(e))
+            self._log.exception(
+                'Accured exception: {}'.format(e))
         self._log.info('Complete')
         return result
 

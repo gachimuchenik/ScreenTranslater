@@ -48,7 +48,7 @@ class Processor(object):
             try:
                 data = self._data_getter.get_data()
             except Exception as e:
-                self._log.error('Accured exception: {}'.format(e))
+                self._log.exception('Accured exception: {}'.format(e))
             if data:
                 if len(self._inputData) >= self._max_buffer_length:
                     self._inputData.pop(0)
