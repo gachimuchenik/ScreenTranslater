@@ -27,7 +27,6 @@ def getParameters():
     parser.add_argument('-c', '--config-path', default='config.ini')
     args = parser.parse_args()
     config = Config(os.path.dirname(__file__), args.config_path)
-
     return config
 
 

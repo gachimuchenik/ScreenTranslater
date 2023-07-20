@@ -8,6 +8,7 @@ import os
 class Config(object):
     def __init__(self, root_path, path):
         config = configparser.ConfigParser()
+        print(f'get config from {os.path.join(root_path, path)}')
         config.read(os.path.join(root_path, path))
 
         # Tesseract config
@@ -35,7 +36,9 @@ class Config(object):
             'System', 'empty_log_on_start')
 
         # data getter
-        self.use_fake_image_getter = config.getboolean('DataGetter', 'use_fake_image_getter')
+        self.data_getter_type = config.get('DataGetter', 'type') # values: folder, clipboard
+        self.use_fake_image_getter = config.getboolean('ClipboardGetter', 'use_fake_image_getter')
+        self.getter_folder_path = os.path.join(root_path, config.get('FolderGetter', 'folder_path'))
 
     def to_dict(self):
         d = {}
