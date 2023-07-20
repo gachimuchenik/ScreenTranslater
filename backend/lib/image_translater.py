@@ -35,8 +35,9 @@ class ImageTranslater(object):
         input_text = pytesseract.image_to_string(
             image, config=self._config.tesseract_custom_conf, output_type='string')
         input_text = input_text.replace('\n', ' ')
+        self._log.info('input_text={}'.format(input_text))
         translated = self._translator.translate(input_text, dest='ru')
-        result = {'en': input_text, 'ru': translated}
+        result = {'en': input_text, 'ru': translated.text}
         self._log.info('Complete')
         return result
 

@@ -40,7 +40,7 @@ def main():
     log.info('==========Started==========\nparams={}'.format(config.to_dict()))
 
     app.config['translator'] = Processor(
-        log, config, ImageGetter(), ImageTranslater(log, config))
+        log, config, ImageGetter(config.use_fake_image_getter), ImageTranslater(log, config))
     app.run(host=config.host, port=config.port, debug=True, use_reloader=False)
     app.config['translator'].stop()
 

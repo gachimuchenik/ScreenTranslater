@@ -34,7 +34,7 @@ def main():
     log.info('==========Started==========\ninput_image={}, config={}'.format(
         input_image, config.to_dict()))
 
-    translator = Processor(log, config, ImageGetter(),
+    translator = Processor(log, config, ImageGetter(config.use_fake_image_getter),
                            ImageTranslater(log, config))
 
     image = Image.open(input_image)
