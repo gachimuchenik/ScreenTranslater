@@ -37,7 +37,9 @@ def main():
     translator.push_data(image)
     while translator.get_counter() == 0:
         sleep(0.1)
-    log.info('result={}'.format(translator.get_processed_data()))
+    result = translator.get_processed_data()
+    log.info('result="{}"'.format(result))
+    print('result="{}"'.format(result))
 
     translator.stop()
 
