@@ -33,6 +33,9 @@ class Config(object):
         self.empty_log_on_start = config.getboolean(
             'System', 'empty_log_on_start')
 
+        # data getter
+        self.use_fake_image_getter = config.getboolean('DataGetter', 'use_fake_image_getter')
+
     def to_dict(self):
         d = {}
         for attr, value in self.__dict__.items():
