@@ -6,11 +6,8 @@ import os
 
 from flask import Flask
 
-from lib.image_getter import ImageGetter
-from lib.image_translater import ImageTranslater
-from lib.processor import Processor
 from lib.config import Config
-from lib.utils import make_logger
+from lib.utils import make_logger, make_image_processor
 
 app = Flask(__name__)
 log = None
@@ -39,8 +36,7 @@ def main():
     log = make_logger(config)
     log.info('==========Started==========\nparams={}'.format(config.to_dict()))
 
-    app.config['translator'] = Processor(
-        log, config, ImageGetter(config.use_fake_image_getter), ImageTranslater(log, config))
+    app.config['translator'] = make_image_processor(config, log)
     app.run(host=config.host, port=config.port, debug=True, use_reloader=False)
     app.config['translator'].stop()
 

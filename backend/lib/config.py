@@ -30,6 +30,7 @@ class Config(object):
 
         # system config
         self.log_path = os.path.join(root_path, config.get('System', 'log_path'))
+        self.log_level = config.get('System', 'log_level')
         self.empty_log_on_start = config.getboolean(
             'System', 'empty_log_on_start')
 
