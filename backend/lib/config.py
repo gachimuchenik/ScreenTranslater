@@ -14,6 +14,9 @@ class Config(object):
         self.tesseract_path = config.get('Tesseract', 'tesseract_path')
         self.tesseract_custom_conf = config.get(
             'Tesseract', 'tesseract_custom_conf')
+        
+        # Data processor config
+        self.max_buffer_length = max(config.getint('DataProcessor', 'max_buffer_length'), 1)
 
         # Preprocessing config
         self.coordinates = [int(x) for x in config.get(

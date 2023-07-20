@@ -13,6 +13,7 @@ class Processor(object):
         self._is_running = True
         self._data_getter = data_getter
         self._data_processor = data_processor
+        self._max_buffer_length = config.max_buffer_length
         self._dataLock = Lock()
         self._reader = Thread(target=self.input_routine)
         self._writer = Thread(target=self.processing_routine)
@@ -35,6 +36,8 @@ class Processor(object):
             if data:
                 text = self._data_processor.process_data(data)
                 if text:
+                    if len(self._outputData) >= self._max_buffer_length:
+                        self._outputData.pop(0)
                     self._outputData.append(text)
                 self._counter += 1
             sleep(0.1)
@@ -47,6 +50,8 @@ class Processor(object):
             except Exception as e:
                 self._log.error('Accured exception: {}'.format(e))
             if data:
+                if len(self._inputData) >= self._max_buffer_length:
+                    self._inputData.pop(0)
                 self._inputData.append(data)
                 self._log.info('New data getted from data getter')
             sleep(0.1)
