@@ -1,24 +1,24 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-from flask import Flask
 import argparse
-import logging
-import sys
 
-from Translator import Translator
-from Config import Config
-from utils import make_logger
+from flask import Flask
+
+from lib.image_getter import ImageGetter
+from lib.image_translater import ImageTranslater
+from lib.processor import Processor
+from lib.config import Config
+from lib.utils import make_logger
 
 app = Flask(__name__)
-
 log = None
 
 
 @app.route("/get_new_text")
 def hello():
     log.info('thread front')
-    return app.config['translator'].getText()
+    return app.config['translator'].get_processed_data()
 
 
 def getParameters():
@@ -38,7 +38,8 @@ def main():
     log = make_logger(config)
     log.info('==========Started==========\nparams={}'.format(config.to_dict()))
 
-    app.config['translator'] = Translator(log, config)
+    app.config['translator'] = Processor(
+        log, config, ImageGetter(), ImageTranslater(log, config))
     app.run(host=config.host, port=config.port, debug=True, use_reloader=False)
     app.config['translator'].stop()
 
