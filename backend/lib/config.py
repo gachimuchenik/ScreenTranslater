@@ -3,6 +3,7 @@
 
 import configparser
 import os
+import platform
 
 
 class Config(object):
@@ -13,6 +14,11 @@ class Config(object):
 
         # Tesseract config
         self.tesseract_path = config.get('Tesseract', 'tesseract_path')
+        if len(self.tesseract_path) == 0:
+            self.tesseract_path = 'tesseract'
+            if platform == 'Windows':
+                self.tesseract_path += '.exe'
+                
         self.tesseract_custom_conf = config.get(
             'Tesseract', 'tesseract_custom_conf')
         
