@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
+import os
 import argparse
 from time import sleep
 
@@ -22,7 +23,7 @@ def getParameters():
     parser.add_argument('-c', '--config-path', default='config.ini')
 
     args = parser.parse_args()
-    config = Config(args.config_path)
+    config = Config(os.path.dirname(__file__), args.config_path)
 
     return (config, args.input)
 
