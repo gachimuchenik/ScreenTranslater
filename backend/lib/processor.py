@@ -54,6 +54,7 @@ class Processor(object):
                     self._inputData.pop(0)
                 self._inputData.append(data)
                 self._log.info('New data getted from data getter')
+                self._log.debug(f'InputQueue size = {len(self._inputData)}')
             sleep(0.1)
 
     def get_processed_data(self):

@@ -2,55 +2,87 @@
 # -*- coding: utf-8 -*-
 
 import time
+import functools
 
 import pytesseract
 from googletrans import Translator as GoogleTranslator
 
 
 class ImageTranslater(object):
+    def log_and_calc(func):
+        @functools.wraps(func)
+        def impl(self, *args, **kwargs):
+            self._log.info('{} Start'.format(func.__name__))
+            self._log.debug('{} Args={}'.format(func.__name__, *args))
+            start = time.time()
+            result = func(self, *args, **kwargs)
+            end = time.time()
+            self._log.info('{} Complete in {}ms'.format(
+                func.__name__, int((end - start) * 1000)))
+            return result
+        return impl
+
     def __init__(self, logger, config):
         self._translator = GoogleTranslator()
         self._config = config
         self._log = logger
         self._log.info('Created ImageTranslater')
 
-    def process_data(self, image):
-        self._log.info('Start')
-        result = None
-        try:
-            start = time.time()
-            result = self._translate_image(
-                self._to_grayscale_image(self._crop_image(image)))
-            end = time.time()
-            self._log.info(
-                f'Image processed: {result}, elapsed: {int((end - start) * 1000)}ms')
-        except Exception as e:
-            self._log.exception(
-                'Accured exception: {}'.format(e))
-        self._log.info('Complete')
-        return result
+    def call_method(self, name, *args):
+        return getattr(self, name)(*args)
 
-    def _translate_image(self, image):
-        self._log.info('Start')
+    def run_pipeline(self, data):
+        for node in self._config.transform_pipeline:
+            data = self.call_method(f'_{node}', data)
+        return data
+
+    @log_and_calc
+    def process_data(self, data):
+        try:
+            return self.run_pipeline(data)
+        except Exception as e:
+            self._log.exception('Accured exception: {}'.format(e))
+            return None
+
+    # in: image
+    # out: text
+    @log_and_calc
+    def _recognize_text(self, image):
+        """ Find text in image using tesseract
+        :param image: input image
+        :return: founded text
+        """ 
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
         input_text = pytesseract.image_to_string(
             image, config=self._config.tesseract_custom_conf, output_type='string')
         input_text = input_text.replace('\n', ' ')
-        self._log.info('input_text={}'.format(input_text))
-        translated = self._translator.translate(input_text, dest='ru')
-        result = {'en': input_text, 'ru': translated.text}
-        self._log.info('Complete')
+        return input_text
+
+    @log_and_calc
+    def _translate_text(self, text):
+        """ Translate text
+        :param text: input text
+        :return: translated text
+        """ 
+        translated = self._translator.translate(text, dest='ru')
+        result = {'en': text, 'ru': translated.text}
         return result
 
+    @log_and_calc
     def _crop_image(self, image):
-        self._log.info('Start')
-        result = image.crop(self._config.coordinates)
-        self._log.info('Complete')
+        """ Crop area from image
+        :param image: input image
+        :return: cropped image
+        """ 
+        result = image.crop(self._config.crop_coordinates)
         return result
 
-    def _to_grayscale_image(self, image):
-        self._log.info('Start')
+    @log_and_calc
+    def _grayscale_image(self, image):
+        """ Grayscale image
+        :param image: input image
+        :return: grayscaled image
+        """ 
         result = image.convert('L').point(
             lambda x: 255 if x > self._config.grayscale_threshold else 0).convert('RGB')
-        self._log.info('Complete')
         return result

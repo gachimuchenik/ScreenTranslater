@@ -133,7 +133,3 @@ dist
 __pycache__/
 *.pyc
 
-#images
-*.png
-*.jpg
-*.jpeg

@@ -3,6 +3,7 @@
 
 import configparser
 import os
+import platform
 
 
 class Config(object):
@@ -13,6 +14,11 @@ class Config(object):
 
         # Tesseract config
         self.tesseract_path = config.get('Tesseract', 'tesseract_path')
+        if len(self.tesseract_path) == 0:
+            self.tesseract_path = 'tesseract'
+            if platform == 'Windows':
+                self.tesseract_path += '.exe'
+                
         self.tesseract_custom_conf = config.get(
             'Tesseract', 'tesseract_custom_conf')
         
@@ -20,17 +26,20 @@ class Config(object):
         self.max_buffer_length = max(config.getint('DataProcessor', 'max_buffer_length'), 1)
 
         # Preprocessing config
-        self.coordinates = [int(x) for x in config.get(
-            'Preprocessing', 'coordinates').split(',')]
+        self.crop_coordinates = [int(x) for x in config.get(
+            'ImageProcessing', 'crop_coordinates').split(',')]
         self.grayscale_threshold = config.getint(
-            'Preprocessing', 'grayscale_threshold')
+            'ImageProcessing', 'grayscale_threshold')
+        self.transform_pipeline = config.get('ImageProcessing', 'pipeline').replace(' ', '').split(',')
 
         # httpserver config
         self.host = config.get('Network', 'host')
         self.port = config.getint('Network', 'port')
 
         # system config
-        self.log_path = os.path.join(root_path, config.get('System', 'log_path'))
+        self.log_path = config.get('System', 'log_path')
+        if len(self.log_path) != 0:
+            os.path.join(root_path, self.log_path)
         self.log_level = config.get('System', 'log_level')
         self.empty_log_on_start = config.getboolean(
             'System', 'empty_log_on_start')
