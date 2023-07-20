@@ -5,7 +5,8 @@ import logging
 import sys
 
 from lib.processor import Processor
-from lib.image_getter import ImageGetter
+from lib.image_getter_clipboard import ImageGetterClipboard
+from lib.image_getter_folder import ImageGetterFolder
 from lib.image_translater import ImageTranslater
 
 
@@ -21,6 +22,12 @@ def make_logger(config):
                             format='%(levelname)s %(asctime)s.%(msecs)03d %(filename)s:%(funcName)s:%(lineno)d: %(message)s', datefmt='%d.%m.%YT%H:%M:%S')
     return logging.getLogger()
 
+def make_image_getter(log, config):
+    if config.data_getter_type == 'clipboard':
+        return ImageGetterClipboard(log, config.use_fake_image_getter)
+    elif config.data_getter_type == 'folder':
+        return ImageGetterFolder(log, config.getter_folder_path)
+    raise RuntimeError(f'Unknown Data Getter type: {config.data_getter_type}')
 
 def make_image_processor(config, log):
-    return Processor(log, config, ImageGetter(log, config.use_fake_image_getter), ImageTranslater(log, config))
+    return Processor(log, config, make_image_getter(log, config), ImageTranslater(log, config))

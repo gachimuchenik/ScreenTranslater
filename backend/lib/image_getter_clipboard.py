@@ -4,11 +4,12 @@
 from PIL import ImageGrab
 
 
-class ImageGetter(object):
+class ImageGetterClipboard(object):
     def __init__(self, log, mocked=False):
         self._last_image = None
         self._mocked = mocked
         self._log = log
+        self._log.info('Created ImageGetterClipboard')
 
     def get_data(self):
         if self._mocked:

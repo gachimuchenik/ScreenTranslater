@@ -12,6 +12,7 @@ class ImageTranslater(object):
         self._translator = GoogleTranslator()
         self._config = config
         self._log = logger
+        self._log.info('Created ImageTranslater')
 
     def process_data(self, image):
         self._log.info('Start')
