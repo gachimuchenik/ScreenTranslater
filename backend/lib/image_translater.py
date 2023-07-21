@@ -3,10 +3,14 @@
 
 import time
 import functools
+import os
+from pathlib import Path
 
 import pytesseract
 from googletrans import Translator as GoogleTranslator
+import PIL
 
+from lib.data_saver import save_image
 
 class ImageTranslater(object):
     def log_and_calc(func):
@@ -27,6 +31,7 @@ class ImageTranslater(object):
         self._config = config
         self._log = logger
         self._log.info('Created ImageTranslater')
+        self._id = 0
 
     def call_method(self, name, *args):
         return getattr(self, name)(*args)
@@ -34,6 +39,11 @@ class ImageTranslater(object):
     def run_pipeline(self, data):
         for node in self._config.transform_pipeline:
             data = self.call_method(f'_{node}', data)
+            if not self._config.log_images:
+                continue
+            if type(data) == PIL.Image.Image:
+                save_image(data, os.path.join(self._config.log_path, str(self._id), node + '.png'))
+        self._id += 1
         return data
 
     @log_and_calc
@@ -69,7 +79,7 @@ class ImageTranslater(object):
         return result
 
     @log_and_calc
-    def _crop_image(self, image):
+    def _crop_image(self, image, coordinates=None):
         """ Crop area from image
         :param image: input image
         :return: cropped image

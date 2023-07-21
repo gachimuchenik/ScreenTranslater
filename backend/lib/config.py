@@ -43,6 +43,7 @@ class Config(object):
         self.log_level = config.get('System', 'log_level')
         self.empty_log_on_start = config.getboolean(
             'System', 'empty_log_on_start')
+        self.log_images = config.getboolean('System', 'log_images')
 
         # data getter
         self.data_getter_type = config.get('DataGetter', 'type') # values: folder, clipboard
