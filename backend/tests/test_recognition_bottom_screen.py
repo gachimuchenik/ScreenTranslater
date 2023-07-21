@@ -3,7 +3,7 @@ import logging
 import os
 from difflib import SequenceMatcher
 
-from PIL import Image
+import cv2
 
 from lib.config import Config
 from lib.image_translater import ImageTranslater
@@ -30,7 +30,7 @@ def test_on_prepared_data():
         image_path = os.path.join(images_folder, image_name)
 
         text = readfile(text_path)
-        image = Image.open(image_path)
+        image = cv2.imread(image_path)
 
         result = translater.process_data(image)
 

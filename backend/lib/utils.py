@@ -6,6 +6,8 @@ from pathlib import Path
 import shutil
 import sys
 import os
+import numpy as np
+import cv2
 
 from lib.processor import Processor
 from lib.image_getter_clipboard import ImageGetterClipboard
