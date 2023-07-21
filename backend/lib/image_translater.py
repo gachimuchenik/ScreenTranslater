@@ -48,13 +48,15 @@ class ImageTranslater(object):
 
     @log_and_calc
     def process_data(self, data):
+        result = None
         try:
-            return self.run_pipeline(data)
+            result = self.run_pipeline(data)
         except Exception as e:
             self._log.exception('Accured exception: {}'.format(e))
-            return None
         finally:
+            self._log.info(f'{self._id} Result = "{result}"')
             self._id += 1
+        return result
 
     # in: image
     # out: text
@@ -68,6 +70,10 @@ class ImageTranslater(object):
         input_text = pytesseract.image_to_string(
             image, config=self._config.tesseract_custom_conf, output_type='string')
         input_text = input_text.replace('\n', ' ')
+        # crunch:
+        input_text = input_text.replace(' | ', ' I ')
+        input_text = input_text.replace('  ', ' ')
+        # crunch:
         return input_text
 
     # in: image
@@ -94,8 +100,13 @@ class ImageTranslater(object):
         :param text: input text
         :return: translated text
         """ 
-        translated = self._translator.translate(text, dest='ru')
-        result = {'en': text, 'ru': translated.text}
+        translated_text = None
+        try:
+            translated = self._translator.translate(text, dest='ru')
+            translated_text = translated.text
+        except Exception as e:
+            self._log.exception(e)
+        result = {'en': text, 'ru': translated_text}
         return result
 
     @log_and_calc
@@ -120,7 +131,11 @@ class ImageTranslater(object):
     
     @log_and_calc
     def _gaussian_blur(self, image):
-        return cv2.GaussianBlur(image, (3,3), 0)  
+        return cv2.GaussianBlur(image, (3,3), 0)
+    
+    @log_and_calc
+    def _bilateral_filter(self, image):
+        return cv2.bilateralFilter(image, 3, 75, 75)
     
     @log_and_calc
     def _thresholding(self, image):
@@ -135,3 +150,19 @@ class ImageTranslater(object):
     @log_and_calc
     def _canny(self, image):
         return cv2.Canny(image=image, threshold1=100, threshold2=200) 
+    
+    @log_and_calc
+    def _kmeans(self, image):
+        Z = image.reshape((-1,3))
+        Z = np.float32(Z)
+
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+        K = 4
+        ret,label,center=cv2.kmeans(Z,K,None,criteria,10,cv2.KMEANS_RANDOM_CENTERS)
+
+        center = np.uint8(center)
+        res = center[label.flatten()]
+        res2 = res.reshape((image.shape))
+
+        return res2
+
