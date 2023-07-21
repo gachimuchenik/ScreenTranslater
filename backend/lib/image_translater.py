@@ -4,11 +4,11 @@
 import time
 import functools
 import os
-from pathlib import Path
 
 import pytesseract
 from googletrans import Translator as GoogleTranslator
-import PIL
+import cv2
+import numpy as np
 
 from lib.data_saver import save_image
 
@@ -41,8 +41,7 @@ class ImageTranslater(object):
             data = self.call_method(f'_{node}', data)
             if not self._config.log_images:
                 continue
-            if type(data) == PIL.Image.Image:
-                save_image(data, os.path.join(self._config.log_path, str(self._id), node + '.png'))
+            save_image(data, os.path.join(self._config.log_path, str(self._id), node + '.png'))
         self._id += 1
         return data
 
@@ -79,13 +78,21 @@ class ImageTranslater(object):
         return result
 
     @log_and_calc
-    def _crop_image(self, image, coordinates=None):
+    def _crop_image(self, image):
         """ Crop area from image
         :param image: input image
         :return: cropped image
         """ 
         result = image.crop(self._config.crop_coordinates)
         return result
+
+    @log_and_calc
+    def _crop_image_cv(self, image):
+        x1 = self._config.crop_coordinates[0]
+        x2 = self._config.crop_coordinates[2]
+        y1 = self._config.crop_coordinates[1]
+        y2 = self._config.crop_coordinates[3]
+        return image[y1:y2, x1:x2]
 
     @log_and_calc
     def _grayscale_image(self, image):
@@ -96,3 +103,23 @@ class ImageTranslater(object):
         result = image.convert('L').point(
             lambda x: 255 if x > self._config.grayscale_threshold else 0).convert('RGB')
         return result
+
+    @log_and_calc
+    def _pil_2_cv(self, image):
+        return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    
+    @log_and_calc
+    def _grayscale_opencv(self, image):
+        return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    @log_and_calc
+    def _denoiser(self, image):
+        return cv2.medianBlur(image, 3)
+    
+    @log_and_calc
+    def _thresholding(self, image):
+        return cv2.threshold(image, 180, 255, cv2.THRESH_BINARY)[1]
+
+
+
+
