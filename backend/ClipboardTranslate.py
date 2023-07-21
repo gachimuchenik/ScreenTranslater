@@ -3,6 +3,7 @@
 
 import argparse
 import os
+import logging
 
 from flask import Flask
 
@@ -32,10 +33,11 @@ def getParameters():
 
 def main():
     config = getParameters()
-    log = make_logger(config)
+    make_logger(config)
+    log = logging.getLogger("main")
     log.info('==========Started==========\nparams={}'.format(config.to_dict()))
 
-    app.config['translator'] = make_image_processor(config, log)
+    app.config['translator'] = make_image_processor(config)
     app.run(host=config.host, port=config.port, debug=True, use_reloader=False)
     app.config['translator'].stop()
 
