@@ -6,6 +6,8 @@ from pathlib import Path
 import shutil
 import sys
 import os
+import numpy as np
+import cv2
 
 from lib.processor import Processor
 from lib.image_getter_clipboard import ImageGetterClipboard
@@ -62,3 +64,6 @@ def make_image_getter(log, config):
 
 def make_image_processor(config, log):
     return Processor(log, config, make_image_getter(log, config), ImageTranslater(log, config))
+
+def pil_2_cv(image):
+    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)

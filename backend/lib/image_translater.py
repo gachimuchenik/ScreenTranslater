@@ -83,33 +83,14 @@ class ImageTranslater(object):
         :param image: input image
         :return: cropped image
         """ 
-        result = image.crop(self._config.crop_coordinates)
-        return result
-
-    @log_and_calc
-    def _crop_image_cv(self, image):
         x1 = self._config.crop_coordinates[0]
         x2 = self._config.crop_coordinates[2]
         y1 = self._config.crop_coordinates[1]
         y2 = self._config.crop_coordinates[3]
         return image[y1:y2, x1:x2]
-
-    @log_and_calc
-    def _grayscale_image(self, image):
-        """ Grayscale image
-        :param image: input image
-        :return: grayscaled image
-        """ 
-        result = image.convert('L').point(
-            lambda x: 255 if x > self._config.grayscale_threshold else 0).convert('RGB')
-        return result
-
-    @log_and_calc
-    def _pil_2_cv(self, image):
-        return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
     
     @log_and_calc
-    def _grayscale_opencv(self, image):
+    def _grayscale_image(self, image):
         return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
     @log_and_calc
@@ -118,7 +99,7 @@ class ImageTranslater(object):
     
     @log_and_calc
     def _thresholding(self, image):
-        return cv2.threshold(image, 180, 255, cv2.THRESH_BINARY)[1]
+        return cv2.threshold(image, 200, 255, cv2.THRESH_BINARY)[1]
 
 
 

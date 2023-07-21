@@ -5,7 +5,7 @@ import os
 import argparse
 from time import sleep
 
-from PIL import Image
+import cv2
 
 from lib.config import Config
 from lib.utils import make_logger, make_image_processor
@@ -33,7 +33,7 @@ def main():
 
     translator = make_image_processor(config, log)
 
-    image = Image.open(input_image)
+    image = cv2.imread(input_image)
     translator.push_data(image)
     while translator.get_counter() == 0:
         sleep(0.1)

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from PIL import ImageGrab
+from lib.utils import pil_2_cv
 
 
 class ImageGetterClipboard(object):
@@ -14,7 +15,7 @@ class ImageGetterClipboard(object):
     def get_data(self):
         if self._mocked:
             return None
-        clipboard_image = ImageGrab.grabclipboard()
+        clipboard_image = pil_2_cv(ImageGrab.grabclipboard())
         if clipboard_image != None and self._last_image != clipboard_image:
             self._log.debug('New image: {}'.format(clipboard_image))
             self._last_image = clipboard_image
