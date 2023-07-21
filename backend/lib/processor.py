@@ -33,7 +33,7 @@ class Processor(object):
                 if len(self._inputData) != 0:
                     data = self._inputData.pop(0)
                     self._log.info('New data getted in processing_routine')
-            if data:
+            if data is not None:
                 text = self._data_processor.process_data(data)
                 if text:
                     if len(self._outputData) >= self._max_buffer_length:
@@ -49,7 +49,7 @@ class Processor(object):
                 data = self._data_getter.get_data()
             except Exception as e:
                 self._log.exception('Accured exception: {}'.format(e))
-            if data:
+            if data is not None:
                 if len(self._inputData) >= self._max_buffer_length:
                     self._inputData.pop(0)
                 self._inputData.append(data)

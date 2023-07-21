@@ -64,6 +64,3 @@ def make_image_getter(log, config):
 
 def make_image_processor(config, log):
     return Processor(log, config, make_image_getter(log, config), ImageTranslater(log, config))
-
-def pil_2_cv(image):
-    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
