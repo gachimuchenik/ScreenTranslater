@@ -3,11 +3,13 @@
 
 from time import sleep
 from threading import Thread, Lock
+import logging
+
+log = logging.getLogger(__name__)
 
 
 class Processor(object):
-    def __init__(self, logger, config, data_getter, data_processor):
-        self._log = logger
+    def __init__(self, config, data_getter, data_processor):
         self._inputData = []
         self._outputData = []
         self._is_running = True
@@ -19,6 +21,7 @@ class Processor(object):
         self._writer = Thread(target=self.processing_routine)
         self._reader.start()
         self._writer.start()
+        print('logger handlers={}'.format(log.hasHandlers()))
 
     def stop(self):
         self._is_running = False
@@ -32,7 +35,7 @@ class Processor(object):
             with self._dataLock:
                 if len(self._inputData) != 0:
                     data = self._inputData.pop(0)
-                    self._log.info('New data getted in processing_routine')
+                    log.info('New data getted in processing_routine')
             if data is not None:
                 text = self._data_processor.process_data(data)
                 if text:
@@ -48,13 +51,13 @@ class Processor(object):
             try:
                 data = self._data_getter.get_data()
             except Exception as e:
-                self._log.exception('Accured exception: {}'.format(e))
+                log.exception('Accured exception: {}'.format(e))
             if data is not None:
                 if len(self._inputData) >= self._max_buffer_length:
                     self._inputData.pop(0)
                 self._inputData.append(data)
-                self._log.info('New data getted from data getter')
-                self._log.debug(f'InputQueue size = {len(self._inputData)}')
+                log.info('New data getted from data getter')
+                log.debug(f'InputQueue size = {len(self._inputData)}')
             sleep(0.1)
 
     def get_processed_data(self):

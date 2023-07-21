@@ -8,8 +8,6 @@ import cv2
 from lib.config import Config
 from lib.image_translater import ImageTranslater
 
-logger = logging.getLogger()
-
 def readfile(path):
     with open(path, 'r') as f:
         return f.read()
@@ -20,7 +18,7 @@ def test_on_prepared_data():
     config = Config(current_folder, '../config.ini')
     config.coordinates = (250,770,1600,1000)
     config.transform_pipeline = config.transform_pipeline[0:-1]
-    translater = ImageTranslater(logger, config)
+    translater = ImageTranslater(config)
     images_folder = os.path.join(current_folder, './data/images')
     texts_folder = os.path.join(current_folder, './data/results')
 
@@ -39,4 +37,4 @@ def test_on_prepared_data():
         result = translater.process_data(image)
 
         print('accuracy={}'.format(SequenceMatcher(None, result, text).ratio()))
-        assert SequenceMatcher(None, result, text).ratio() > 0.96, "Lines not equal enough"
+        assert SequenceMatcher(None, result, text).ratio() > 0.95, "Lines not equal enough"

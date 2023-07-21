@@ -5,8 +5,12 @@ import time
 import functools
 import csv
 import os
+import logging
 
 import pytesseract
+# import pkg_resources
+# from symspellpy import SymSpell, Verbosity
+from spellchecker import SpellChecker
 from googletrans import Translator as GoogleTranslator
 import cv2
 import numpy as np
@@ -14,26 +18,34 @@ import numpy as np
 from lib.data_saver import save_image
 from lib.area_pattern_analyzer import AreaPatternAnalyzer
 
+log = logging.getLogger(__name__)
+
 class ImageTranslater(object):
     def log_and_calc(func):
         @functools.wraps(func)
         def impl(self, *args, **kwargs):
-            self._log.info('{} Start'.format(func.__name__))
-            self._log.debug('{} Args={}'.format(func.__name__, *args))
+            log.info('{} Start'.format(func.__name__))
+            log.debug('{} Args={}'.format(func.__name__, *args))
             start = time.time()
             result = func(self, *args, **kwargs)
             end = time.time()
-            self._log.info('{} Complete in {}ms'.format(
+            log.info('{} Complete in {}ms'.format(
                 func.__name__, int((end - start) * 1000)))
             return result
         return impl
 
-    def __init__(self, logger, config):
+    def __init__(self, config):
         self._translator = GoogleTranslator()
         self._config = config
-        self._log = logger
-        self._log.info('Created ImageTranslater')
+        log.info('Created ImageTranslater')
         self._id = 0
+        self._spellcheck = SpellChecker(distance=1)  
+        self._pattern_analyser = AreaPatternAnalyzer(config)
+        # self._spellcheck.word_frequency.load_text_file(os.path.dirname(__file__), "frequency_dictionary_en_82_765.txt")
+        # self._sym_spell = SymSpell(max_dictionary_edit_distance=1, prefix_length=4)
+        # dictionary_path = os.path.join(os.path.dirname(__file__), "frequency_dictionary_en_82_765.txt")
+        # self._sym_spell.load_dictionary(dictionary_path, term_index=0, count_index=1)
+
 
     def call_method(self, name, *args):
         return getattr(self, name)(*args)
@@ -52,12 +64,36 @@ class ImageTranslater(object):
         try:
             result = self.run_pipeline(data)
         except Exception as e:
-            self._log.exception('Accured exception: {}'.format(e))
+            log.exception('Accured exception: {}'.format(e))
         finally:
-            self._log.info(f'{self._id} Result = "{result}"')
+            log.info(f'{self._id} Result = "{result}"')
             self._id += 1
         return result
 
+    @log_and_calc
+    def _crunch_after_recognize(self, text):
+        text = text.replace(' | ', ' I ')
+        text = text.replace('  ', ' ')
+        text = text.replace('(A)', '')
+        return text
+    
+    @log_and_calc
+    def _autocorrect(self, text):
+        # return text
+        splitted_text = self._spellcheck.split_words(text)
+        log.error(splitted_text)
+        result_text = []
+        for word in splitted_text:
+            try:
+                suggested = self._spellcheck.correction(word)
+                if not suggested or suggested == word:
+                    continue
+                text.replace(word, suggested)
+                log.error('replaced {} -> {}'.format(word, suggested))
+            except ValueError:
+                result_text.append(word)
+        return text
+        
     # in: image
     # out: text
     @log_and_calc
@@ -70,10 +106,6 @@ class ImageTranslater(object):
         input_text = pytesseract.image_to_string(
             image, config=self._config.tesseract_custom_conf, output_type='string')
         input_text = input_text.replace('\n', ' ')
-        # crunch:
-        input_text = input_text.replace(' | ', ' I ')
-        input_text = input_text.replace('  ', ' ')
-        # crunch:
         return input_text
 
     # in: image
@@ -81,7 +113,7 @@ class ImageTranslater(object):
     @log_and_calc
     def _recognize_text_from_tesseract_data(self, image):
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
-        data_csv = pytesseract.image_to_data(image, config='--psm 3', output_type='string')
+        data_csv = pytesseract.image_to_data(image, config=self._config.tesseract_custom_conf, output_type='string')
         data_csv_lines = data_csv.splitlines()
         csv_reader = csv.reader(data_csv_lines, delimiter='\t')
         csv_reader.__next__() # skip head row
@@ -89,9 +121,8 @@ class ImageTranslater(object):
         for row in csv_reader:
             confidence = float(row[10])
             text = row[11]
-            if confidence > 80:
+            if confidence > 15:
                 input_text += text + ' '
-        input_text = input_text.replace('| ', 'I ')
         return input_text
 
     @log_and_calc
@@ -105,7 +136,7 @@ class ImageTranslater(object):
             translated = self._translator.translate(text, dest='ru')
             translated_text = translated.text
         except Exception as e:
-            self._log.exception(e)
+            log.exception(e)
         result = {'en': text, 'ru': translated_text}
         return result
 
@@ -139,13 +170,19 @@ class ImageTranslater(object):
     
     @log_and_calc
     def _thresholding(self, image):
-        return cv2.threshold(image, 200, 255, cv2.THRESH_BINARY)[1]
+        return cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 101, -100)
+        # return cv2.threshold(image, 200, 255, cv2.THRESH_BINARY)[1]
+        
 
     @log_and_calc
     def _pattern_analysis(self, image):
         test = AreaPatternAnalyzer(self._config)
-        self._log.info(test.pattern_analysis(image))
+        log.info(test.pattern_analysis(image))
         return image
+
+    @log_and_calc
+    def _get_areas(self, image):
+        return self._pattern_analyser.get_boxes(image)
 
     @log_and_calc
     def _canny(self, image):
@@ -166,3 +203,12 @@ class ImageTranslater(object):
 
         return res2
 
+    @log_and_calc
+    def _resize(self, image):
+        scale_percent = 50 # percent of original size
+        width = int(image.shape[1] * scale_percent / 100)
+        height = int(image.shape[0] * scale_percent / 100)
+        dim = (width, height)
+        
+        # resize image
+        return cv2.resize(image, dim, interpolation = cv2.INTER_AREA)

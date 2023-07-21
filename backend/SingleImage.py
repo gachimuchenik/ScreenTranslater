@@ -4,6 +4,7 @@
 import os
 import argparse
 from time import sleep
+import logging
 
 import cv2
 
@@ -28,10 +29,12 @@ def getParameters():
 def main():
     (config, input_image) = getParameters()
     log = make_logger(config)
+    log = logging.getLogger("main")
     log.info('==========Started==========\ninput_image={}, config={}'.format(
         input_image, config.to_dict()))
 
-    translator = make_image_processor(config, log)
+    config.data_getter_type = 'clipboard'
+    translator = make_image_processor(config)
 
     image = cv2.imread(input_image)
     translator.push_data(image)
@@ -39,7 +42,7 @@ def main():
         sleep(0.1)
     result = translator.get_processed_data()
     log.info('result="{}"'.format(result))
-    print('result="{}"'.format(result))
+    err_log.error('result="{}"'.format(result))
 
     translator.stop()
 
