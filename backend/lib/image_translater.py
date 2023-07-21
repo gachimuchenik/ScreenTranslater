@@ -14,7 +14,7 @@ from spellchecker import SpellChecker
 from googletrans import Translator as GoogleTranslator
 import cv2
 import numpy as np
-
+from lib.area_pattern_analyzer import AreaPatternAnalyzer
 from lib.data_saver import save_image
 from lib.area_pattern_analyzer import AreaPatternAnalyzer
 
