@@ -3,6 +3,7 @@
 
 import time
 import functools
+import csv
 import os
 
 import pytesseract
@@ -67,6 +68,24 @@ class ImageTranslater(object):
         input_text = input_text.replace('\n', ' ')
         return input_text
 
+    # in: image
+    # out: text
+    @log_and_calc
+    def _recognize_text_from_tesseract_data(self, image):
+        pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
+        data_csv = pytesseract.image_to_data(image, config='--psm 3', output_type='string')
+        data_csv_lines = data_csv.splitlines()
+        csv_reader = csv.reader(data_csv_lines, delimiter='\t')
+        csv_reader.__next__() # skip head row
+        input_text = ''
+        for row in csv_reader:
+            confidence = float(row[10])
+            text = row[11]
+            if confidence > 80:
+                input_text += text + ' '
+        input_text = input_text.replace('| ', 'I ')
+        return input_text
+
     @log_and_calc
     def _translate_text(self, text):
         """ Translate text
@@ -101,6 +120,8 @@ class ImageTranslater(object):
     def _thresholding(self, image):
         return cv2.threshold(image, 200, 255, cv2.THRESH_BINARY)[1]
 
-
-
-
+    @log_and_calc
+    def _pattern_analysis(self, image):
+        test = AreaPatternAnalyzer(self._config)
+        self._log.info(test.pattern_analysis(image))
+        return image
