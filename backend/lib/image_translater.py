@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 
 from lib.data_saver import save_image
+from lib.area_pattern_analyzer import AreaPatternAnalyzer
 
 class ImageTranslater(object):
     def log_and_calc(func):
@@ -43,7 +44,6 @@ class ImageTranslater(object):
             if not self._config.log_images:
                 continue
             save_image(data, os.path.join(self._config.log_path, str(self._id), node + '.png'))
-        self._id += 1
         return data
 
     @log_and_calc
@@ -53,6 +53,8 @@ class ImageTranslater(object):
         except Exception as e:
             self._log.exception('Accured exception: {}'.format(e))
             return None
+        finally:
+            self._id += 1
 
     # in: image
     # out: text
@@ -117,6 +119,10 @@ class ImageTranslater(object):
         return cv2.medianBlur(image, 3)
     
     @log_and_calc
+    def _gaussian_blur(self, image):
+        return cv2.GaussianBlur(image, (3,3), 0)  
+    
+    @log_and_calc
     def _thresholding(self, image):
         return cv2.threshold(image, 200, 255, cv2.THRESH_BINARY)[1]
 
@@ -125,3 +131,7 @@ class ImageTranslater(object):
         test = AreaPatternAnalyzer(self._config)
         self._log.info(test.pattern_analysis(image))
         return image
+
+    @log_and_calc
+    def _canny(self, image):
+        return cv2.Canny(image=image, threshold1=100, threshold2=200) 

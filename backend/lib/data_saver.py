@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 
 from pathlib import Path
+import os
+
 import PIL
 import numpy
 import cv2
 
 def precreate_folders(path):
-    folder_path = '/'.join(path.split('/')[0:-1])
+    folder_path = os.path.dirname(path)
     Path(folder_path).mkdir(parents=True, exist_ok=True)
 
 def save_PIL(image, path):

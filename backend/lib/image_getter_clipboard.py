@@ -3,6 +3,7 @@
 
 from PIL import ImageGrab
 import cv2
+import numpy as np
 
 
 class ImageGetterClipboard(object):
@@ -15,8 +16,9 @@ class ImageGetterClipboard(object):
     def get_data(self):
         if self._mocked:
             return None
-        clipboard_image = cv2.cvtColor(np.array(ImageGrab.grabclipboard()), cv2.COLOR_RGB2BGR)
+        clipboard_image = ImageGrab.grabclipboard()
         if clipboard_image != None and self._last_image != clipboard_image:
+            clipboard_image = cv2.cvtColor(np.array(clipboard_image), cv2.COLOR_RGB2BGR)
             self._log.debug('New image: {}'.format(clipboard_image))
             self._last_image = clipboard_image
             return self._last_image
