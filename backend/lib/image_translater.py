@@ -4,11 +4,14 @@
 import time
 import functools
 import csv
+import os
 
 import pytesseract
 from googletrans import Translator as GoogleTranslator
-from lib.area_pattern_analyzer import AreaPatternAnalyzer
+import cv2
+import numpy as np
 
+from lib.data_saver import save_image
 
 class ImageTranslater(object):
     def log_and_calc(func):
@@ -29,6 +32,7 @@ class ImageTranslater(object):
         self._config = config
         self._log = logger
         self._log.info('Created ImageTranslater')
+        self._id = 0
 
     def call_method(self, name, *args):
         return getattr(self, name)(*args)
@@ -36,6 +40,10 @@ class ImageTranslater(object):
     def run_pipeline(self, data):
         for node in self._config.transform_pipeline:
             data = self.call_method(f'_{node}', data)
+            if not self._config.log_images:
+                continue
+            save_image(data, os.path.join(self._config.log_path, str(self._id), node + '.png'))
+        self._id += 1
         return data
 
     @log_and_calc
@@ -94,18 +102,23 @@ class ImageTranslater(object):
         :param image: input image
         :return: cropped image
         """ 
-        result = image.crop(self._config.crop_coordinates)
-        return result
-
+        x1 = self._config.crop_coordinates[0]
+        x2 = self._config.crop_coordinates[2]
+        y1 = self._config.crop_coordinates[1]
+        y2 = self._config.crop_coordinates[3]
+        return image[y1:y2, x1:x2]
+    
     @log_and_calc
     def _grayscale_image(self, image):
-        """ Grayscale image
-        :param image: input image
-        :return: grayscaled image
-        """ 
-        result = image.convert('L').point(
-            lambda x: 255 if x > self._config.grayscale_threshold else 0).convert('RGB')
-        return result
+        return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    @log_and_calc
+    def _denoiser(self, image):
+        return cv2.medianBlur(image, 3)
+    
+    @log_and_calc
+    def _thresholding(self, image):
+        return cv2.threshold(image, 200, 255, cv2.THRESH_BINARY)[1]
 
     @log_and_calc
     def _pattern_analysis(self, image):

@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-from PIL import Image
 import os
+import cv2
 
 
 class ImageGetterFolder(object):
@@ -18,7 +18,7 @@ class ImageGetterFolder(object):
         for entry in os.scandir(self._path):
             if entry.is_file():
                 self._log.info(f'readed file: {entry.name}')
-                yield Image.open(entry.path)
+                yield cv2.imread(entry.path)
         self._log.info('Folder readed complete')
         print('Folder readed complete')
         self._done = True
