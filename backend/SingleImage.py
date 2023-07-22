@@ -41,8 +41,7 @@ def main():
     while translator.get_counter() == 0:
         sleep(0.1)
     result = translator.get_processed_data()
-    log.info('result="{}"'.format(result))
-    err_log.error('result="{}"'.format(result))
+    log.error('result="{}"'.format(result))
 
     translator.stop()
 

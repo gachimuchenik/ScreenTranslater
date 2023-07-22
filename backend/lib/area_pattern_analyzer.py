@@ -116,10 +116,9 @@ class AreaPatternAnalyzer(object):
             # boxes
         boxes = non_max_suppression(np.array(rects), probs=confidences)
         # loop over the bounding boxes
-        log.error(f'boxes_len={len(boxes)}')
-        new_boxes = self.get_lines(H, boxes)
-        log.error(f'new_boxes_len={len(new_boxes)}')
-        for (startX, startY, endX, endY) in new_boxes:
+        boxes = self.make_bigger_blocks(boxes, W, H)
+        boxes = self.get_lines(boxes)
+        for (startX, startY, endX, endY) in boxes:
             # scale the bounding box coordinates based on the respective
             # ratios
             startX = int(startX * rW)
@@ -131,30 +130,35 @@ class AreaPatternAnalyzer(object):
             # draw the bounding box on the image
             cv2.rectangle(image, (startX, startY), (endX, endY), (0, 255, 0), 2)
         return image
+    
+    def make_bigger_blocks(self, boxes, W, H):
+        log.error(f'before={boxes}')
+        for box in boxes:
+            w = int((box[2] - box[0]) / 100.0 * 50)
+            h = int((box[3] - box[1]) / 100.0 * 50)
+            box[0] = max(box[0] - w, 0)
+            box[1] = max(box[1] - h, 0)
+            box[2] = min(box[2] + w, W)
+            box[3] = min(box[3] + h, H)
+        log.error(f'after={boxes}')
+        return boxes
 
-    def get_lines(self, H, boxes):
-        new_boxes = np.empty_like(boxes)
-        for i in range(H):
-            new_box = None
-            for box in boxes:
-                # log.error(f'{box}')
-                if i < box[1] or i > box[3]:
+    def get_lines(self, boxes):
+        for i in range(len(boxes)):
+            if boxes[i][0] == -1 and boxes[i][1] == -1 and boxes[i][2] == -1 and boxes[i][3] == -1:
+                continue
+            for j in range(i+1, len(boxes)):
+                if boxes[j][0] == -1 and boxes[j][1] == -1 and boxes[j][2] == -1 and boxes[j][3] == -1:
                     continue
-                # log.error(f' {i} found {box}')
-                if new_box is None:
-                    new_box = box
-                else:
-                    new_box[0] = min(new_box[0], box[0])
-                    new_box[1] = min(new_box[1], box[1])
-                    new_box[2] = max(new_box[2], box[2])
-                    new_box[3] = max(new_box[3], box[3])
-            # print(f'new_box={new_box}')
-            if new_box is not None:
-                np.append(new_boxes, new_box)
-                print(f'new_boxes={new_boxes}')
-        new_boxes = np.unique(new_boxes) # im just a lazy guy
-        # print(f'unique_new_boxes={new_boxes}')
-        return new_boxes
+                if boxes[i][3] < boxes[j][1] or boxes[i][1] > boxes[j][3]:
+                    continue
+                boxes[i][0] = min(boxes[i][0], boxes[j][0])
+                boxes[i][1] = min(boxes[i][1], boxes[j][1])
+                boxes[i][2] = max(boxes[i][2], boxes[j][2])
+                boxes[i][3] = max(boxes[i][3], boxes[j][3])
+                boxes[j] = np.array([-1,-1,-1,-1])
+        boxes = boxes[~np.all(boxes == 0, axis=1)]
+        return boxes
         
 
     def pattern_analysis(self, image):

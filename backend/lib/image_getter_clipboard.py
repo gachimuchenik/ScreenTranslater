@@ -10,7 +10,7 @@ log = logging.getLogger(__name__)
 
 
 class ImageGetterClipboard(object):
-    def __init__(self, log, mocked=False):
+    def __init__(self, mocked=False):
         self._last_image = None
         self._mocked = mocked
         log.info('Created ImageGetterClipboard')
