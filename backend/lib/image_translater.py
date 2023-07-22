@@ -40,11 +40,13 @@ class ImageTranslater(object):
         return getattr(self, name)(*args)
 
     def run_pipeline(self, data):
+        step = 0
         for node in self._config.transform_pipeline:
+            step += 1
             data = self.call_method(f'_{node}', data)
             if not self._config.log_images:
                 continue
-            save_data(data, os.path.join(self._config.log_path, str(self._id)), node)
+            save_data(data, os.path.join(self._config.log_path, str(self._id)), f'step{step}_' + node)
         return data
 
     @log_and_calc
@@ -61,6 +63,8 @@ class ImageTranslater(object):
 
     @log_and_calc
     def _crunch_after_recognize(self, text):
+        if type(text) == dict:
+            return self._run_multiple_data(self._crunch_after_recognize, text, 'original_text', 'original_text')
         text = text.replace(' | ', ' I ')
         text = text.replace('  ', ' ')
         text = text.replace('(A)', '')
@@ -91,6 +95,8 @@ class ImageTranslater(object):
         :param image: input image
         :return: founded text
         """ 
+        if type(image) == dict:
+            return self._run_multiple_data(self._recognize_text, image, 'images', 'original_text')
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
         input_text = pytesseract.image_to_string(
             image, config=self._config.tesseract_custom_conf, output_type='string')
@@ -101,12 +107,15 @@ class ImageTranslater(object):
     # out: text
     @log_and_calc
     def _recognize_text_from_tesseract_data(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._recognize_text_from_tesseract_data, image, 'images', 'original_text')
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
         data_csv = pytesseract.image_to_data(image, config=self._config.tesseract_custom_conf, output_type='string')
         data_csv_lines = data_csv.splitlines()
         csv_reader = csv.reader(data_csv_lines, delimiter='\t')
         csv_reader.__next__() # skip head row
         input_text = ''
+        log.info(data_csv_lines)
         for row in csv_reader:
             confidence = float(row[10])
             text = row[11]
@@ -120,22 +129,25 @@ class ImageTranslater(object):
         :param text: input text
         :return: translated text
         """ 
+        if type(text) == dict:
+            return self._run_multiple_data(self._translate_text, text, 'original_text', 'translated_text')
         translated_text = None
         try:
             translated = self._translator.translate(text, dest='ru')
             translated_text = translated.text
         except Exception as e:
             log.exception(e)
-        result = {'en': text, 'ru': translated_text}
-        return result
-
+        return translated_text
+    
     @log_and_calc
-    def _run_multiple(self, function, data):
-        newImages = []
-        for image in data['images']:
-            image = function(image)
-            newImages.append(image)
-        data['images'] = newImages
+    def _run_multiple_data(self, function, data, input_field='images', output_field='images'):
+        result = []
+        for obj in data[input_field]:
+            obj = function(obj)
+            if type(obj) == str:
+                log.info(f'{function.__name__} result {obj}')
+            result.append(obj)
+        data[output_field] = result
         return data
 
     @log_and_calc
@@ -157,38 +169,24 @@ class ImageTranslater(object):
             result['boxes'].append(box)
             result['images'].append(preprocessing.crop_image(image, box))
         return result
-    
-    @log_and_calc
-    def _recognize_text_multiple_images(self, data):
-        data['original_text'] = []
-        for image in data['images']:
-            result = self._recognize_text_from_tesseract_data(image)
-            data['original_text'].append(result)
-        return data
-
-    @log_and_calc
-    def _crop_image(self, image):
-        if type(image) == dict:
-            return self._run_multiple(self._crop_image, image)
-        return preprocessing.crop_image(image, self._config.crop_coordinates)
 
     @log_and_calc
     def _resize(self, image):
         if type(image) == dict:
-            return self._run_multiple(self._crop_image, image)
+            return self._run_multiple_data(self._crop_image, image)
         return preprocessing.resize(image)
 
     @log_and_calc
     def _normalization(self, image):
         if type(image) == dict:
-            return self._run_multiple(self._normalization, image)
+            return self._run_multiple_data(self._normalization, image)
         norm_img = np.zeros((image.shape[0], image.shape[1]))
         return cv2.normalize(image, norm_img, 0, 255, cv2.NORM_MINMAX)
     
     @log_and_calc
     def _deskew(self, image):
         if type(image) == dict:
-            return self._run_multiple(self._deskew, image)
+            return self._run_multiple_data(self._deskew, image)
         co_ords = np.column_stack(np.where(image > 0))
         angle = cv2.minAreaRect(co_ords)[-1]
         if angle < -45:
@@ -204,24 +202,49 @@ class ImageTranslater(object):
     @log_and_calc
     def _thinning(self, image):
         if type(image) == dict:
-            return self._run_multiple(self._thinning, image)
-        kernel = np.ones((5,5),np.uint8)
+            return self._run_multiple_data(self._thinning, image)
+        kernel = np.ones((3,3),np.uint8)
         return cv2.erode(image, kernel, iterations = 1)
     
     @log_and_calc
+    def _remove_noise_colored(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._remove_noise, image)
+        return cv2.fastNlMeansDenoisingColored(image, None, 15, 10, 21, 7)
+
+    @log_and_calc
     def _remove_noise(self, image):
         if type(image) == dict:
-            return self._run_multiple(self._remove_noise, image)
-        return cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 15)
+            return self._run_multiple_data(self._remove_noise, image)
+        # return cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 15)
+        return cv2.fastNlMeansDenoising(image, None, 10, 7, 15)
+    
+
+    @log_and_calc
+    def _threshold(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._threshold, image)
+        return preprocessing.threshold(image)
+
+
+    @log_and_calc
+    def _adaptive_threshold(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._adaptive_threshold, image)
+        return preprocessing.adaptive_threshold(image)
+
+    @log_and_calc
+    def _grayscale(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._grayscale, image)
+        return preprocessing.grayscale_image(image)
     
     @log_and_calc
-    def _make_text_visible(self, image):
+    def _gaussian_blur(self, image):
         if type(image) == dict:
-            return self._run_multiple(self._make_text_visible, image)
-        # image = preprocessing.kmeans(image)
-        image = preprocessing.grayscale_image(image)
-        image = preprocessing.bilateral_filter(image)
-        return preprocessing.thresholding(image)
+            return self._run_multiple_data(self._gaussian_blur, image)
+        return preprocessing.gaussian_blur(image)
+
     
 
     

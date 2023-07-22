@@ -21,7 +21,6 @@ class Processor(object):
         self._writer = Thread(target=self.processing_routine)
         self._reader.start()
         self._writer.start()
-        print('logger handlers={}'.format(log.hasHandlers()))
 
     def stop(self):
         self._is_running = False

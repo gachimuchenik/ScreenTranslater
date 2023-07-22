@@ -43,8 +43,8 @@ def main():
         sleep(0.1)
     result = translator.get_processed_data()
     
-    if 'original_text' in result:
-        log.error(result['original_text'])
+    print(result['original_text'])
+    print(result['translated_text'])
 
     translator.stop()
 

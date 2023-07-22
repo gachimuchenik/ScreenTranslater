@@ -25,8 +25,11 @@ def gaussian_blur(image):
 def bilateral_filter(image):
     return cv2.bilateralFilter(image, 3, 75, 75)
 
-def thresholding(image):
-    return cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 21, -40)
+def adaptive_threshold(image):
+    return cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, -7)
+
+def threshold(image):
+    return cv2.threshold(image, 180, 255, cv2.THRESH_BINARY_INV) [1]
 
 def canny(image):
     return cv2.Canny(image=image, threshold1=100, threshold2=200) 

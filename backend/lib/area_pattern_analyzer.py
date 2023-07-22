@@ -116,8 +116,8 @@ class AreaPatternAnalyzer(object):
             # boxes
         boxes = non_max_suppression(np.array(rects), probs=confidences)
         # loop over the bounding boxes
-        boxes = self.make_bigger_blocks(boxes, W, H)
-        boxes = self.get_lines(boxes)
+        # boxes = self.make_bigger_blocks(boxes, W, H)
+        boxes = self.get_lines(boxes, W, H)
         for box in boxes:
             # scale the bounding box coordinates based on the respective
             # ratios
@@ -125,35 +125,50 @@ class AreaPatternAnalyzer(object):
             box[1] = int(box[1] * rH)
             box[2] = int(box[2] * rW)
             box[3] = int(box[3] * rH)
-            # cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+            cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
         log.info(f'boxes={boxes}')
         return {'image': image, 'boxes': boxes}
     
-    def make_bigger_blocks(self, boxes, W, H):
-        for box in boxes:
-            w = int(((box[2] - box[0]) / 100.0) * 50)
-            h = int(((box[3] - box[1]) / 100.0) * 50)
-            box[0] = max(box[0] - w, 0)
-            box[1] = max(box[1] - h, 0)
-            box[2] = min(box[2] + w, W)
-            box[3] = min(box[3] + h, H)
-        return boxes
+    def make_block_bigger(self, box, W, H, perc):
+        newBox = np.array([0,0,0,0])
+        w = int(((box[2] - box[0]) / 100.0) * perc)
+        h = int(((box[3] - box[1]) / 100.0) * perc)
+        newBox[0] = max(box[0] - w, 0)
+        newBox[1] = max(box[1] - h, 0)
+        newBox[2] = min(box[2] + w, W)
+        newBox[3] = min(box[3] + h, H)
+        return newBox
 
-    def get_lines(self, boxes):
+    def combine_boxes(self, box1, box2):
+        box1[0] = min(box1[0], box2[0])
+        box1[1] = min(box1[1], box2[1])
+        box1[2] = max(box1[2], box2[2])
+        box1[3] = max(box1[3], box2[3])
+        return box1
+
+    def get_lines(self, boxes, W, H):
+        for it in range(3):
+            for i in range(len(boxes)):
+                first_box = self.make_block_bigger(boxes[i], W, H, 50)
+                if first_box[0] == -1 and first_box[1] == -1 and first_box[2] == -1 and first_box[3] == -1:
+                    continue
+                for j in range(i+1, len(boxes)):
+                    second_box = self.make_block_bigger(boxes[j], W, H, 50)
+                    if second_box[0] == -1 and second_box[1] == -1 and second_box[2] == -1 and second_box[3] == -1:
+                        continue
+                    if first_box[3] < second_box[1] or first_box[1] > second_box[3]:
+                        continue
+                    boxes[i] = self.combine_boxes(boxes[i], boxes[j])
+                    first_box = self.combine_boxes(first_box, second_box)
+                    boxes[j] = np.array([-1,-1,-1,-1])
+            boxes = boxes[~np.all(boxes == -1, axis=1)]
+            boxes = np.unique(boxes, axis=0)
+
         for i in range(len(boxes)):
-            if boxes[i][0] == -1 and boxes[i][1] == -1 and boxes[i][2] == -1 and boxes[i][3] == -1:
-                continue
-            for j in range(i+1, len(boxes)):
-                if boxes[j][0] == -1 and boxes[j][1] == -1 and boxes[j][2] == -1 and boxes[j][3] == -1:
-                    continue
-                if boxes[i][3] < boxes[j][1] or boxes[i][1] > boxes[j][3]:
-                    continue
-                boxes[i][0] = min(boxes[i][0], boxes[j][0])
-                boxes[i][1] = min(boxes[i][1], boxes[j][1])
-                boxes[i][2] = max(boxes[i][2], boxes[j][2])
-                boxes[i][3] = max(boxes[i][3], boxes[j][3])
-                boxes[j] = np.array([-1,-1,-1,-1])
-        boxes = boxes[~np.all(boxes == -1, axis=1)]
+            boxes[i][0] -= 2
+            boxes[i][1] -= 2
+            boxes[i][2] += 2
+            boxes[i][3] += 2
         return boxes
     
     def get_boxes_2(self, image):
