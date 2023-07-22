@@ -178,7 +178,8 @@ class AreaPatternAnalyzer(object):
         data_csv_lines = data_csv.splitlines()
         csv_reader = csv.reader(data_csv_lines, delimiter='\t')
         csv_reader.__next__() # skip head row
-        boxes = np.zeros((len()))
+        boxes = np.zeros((len(csv_reader), 4))
+        num = 0
         for row in csv_reader:
             confidence = float(row[10])
             if confidence > 90:
@@ -187,7 +188,11 @@ class AreaPatternAnalyzer(object):
                 width = int(row[8])
                 height = int(row[9])
                 word_bounds = (left, top, left + width, top + height)
-                boxes.append()
+                boxes[num] = np.array([word_bounds[0], word_bounds[1], word_bounds[2], word_bounds[3]])
+        boxes = boxes[~np.all(boxes == 0, axis=1)]
+        (H, W) = image.shape[:2]
+        boxes = self.get_lines(boxes, W, H)
+        return boxes
 
     def pattern_analysis(self, image):
         for pattern in self._patterns:
