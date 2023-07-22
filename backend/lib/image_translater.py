@@ -15,25 +15,14 @@ from googletrans import Translator as GoogleTranslator
 import cv2
 import numpy as np
 from lib.area_pattern_analyzer import AreaPatternAnalyzer
-from lib.data_saver import save_image
+from lib.data_saver import save_data
 from lib.area_pattern_analyzer import AreaPatternAnalyzer
+from lib.utils import log_and_calc
+import lib.preprocessing as preprocessing
 
 log = logging.getLogger(__name__)
 
 class ImageTranslater(object):
-    def log_and_calc(func):
-        @functools.wraps(func)
-        def impl(self, *args, **kwargs):
-            log.info('{} Start'.format(func.__name__))
-            log.debug('{} Args={}'.format(func.__name__, *args))
-            start = time.time()
-            result = func(self, *args, **kwargs)
-            end = time.time()
-            log.info('{} Complete in {}ms'.format(
-                func.__name__, int((end - start) * 1000)))
-            return result
-        return impl
-
     def __init__(self, config):
         self._translator = GoogleTranslator()
         self._config = config
@@ -55,7 +44,7 @@ class ImageTranslater(object):
             data = self.call_method(f'_{node}', data)
             if not self._config.log_images:
                 continue
-            save_image(data, os.path.join(self._config.log_path, str(self._id), node + '.png'))
+            save_data(data, os.path.join(self._config.log_path, str(self._id)), node)
         return data
 
     @log_and_calc
@@ -141,74 +130,98 @@ class ImageTranslater(object):
         return result
 
     @log_and_calc
-    def _crop_image(self, image):
-        """ Crop area from image
-        :param image: input image
-        :return: cropped image
-        """ 
-        x1 = self._config.crop_coordinates[0]
-        x2 = self._config.crop_coordinates[2]
-        y1 = self._config.crop_coordinates[1]
-        y2 = self._config.crop_coordinates[3]
-        return image[y1:y2, x1:x2]
-    
-    @log_and_calc
-    def _grayscale_image(self, image):
-        return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
-    @log_and_calc
-    def _denoiser(self, image):
-        return cv2.medianBlur(image, 3)
-    
-    @log_and_calc
-    def _gaussian_blur(self, image):
-        return cv2.GaussianBlur(image, (3,3), 0)
-    
-    @log_and_calc
-    def _bilateral_filter(self, image):
-        return cv2.bilateralFilter(image, 3, 75, 75)
-    
-    @log_and_calc
-    def _thresholding(self, image):
-        return cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 101, -100)
-        # return cv2.threshold(image, 200, 255, cv2.THRESH_BINARY)[1]
-        
+    def _run_multiple(self, function, data):
+        newImages = []
+        for image in data['images']:
+            image = function(image)
+            newImages.append(image)
+        data['images'] = newImages
+        return data
 
     @log_and_calc
     def _pattern_analysis(self, image):
         test = AreaPatternAnalyzer(self._config)
         log.info(test.pattern_analysis(image))
         return image
-
+    
     @log_and_calc
     def _get_areas(self, image):
         return self._pattern_analyser.get_boxes(image)
-
-    @log_and_calc
-    def _canny(self, image):
-        return cv2.Canny(image=image, threshold1=100, threshold2=200) 
     
     @log_and_calc
-    def _kmeans(self, image):
-        Z = image.reshape((-1,3))
-        Z = np.float32(Z)
+    def _crop_fields(self, data):
+        image = data['image']
+        boxes = data['boxes']
+        result = {'boxes': [], 'images': [], 'original_image': image}
+        for box in boxes:
+            result['boxes'].append(box)
+            result['images'].append(preprocessing.crop_image(image, box))
+        return result
+    
+    @log_and_calc
+    def _recognize_text_multiple_images(self, data):
+        data['original_text'] = []
+        for image in data['images']:
+            result = self._recognize_text_from_tesseract_data(image)
+            data['original_text'].append(result)
+        return data
 
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-        K = 4
-        ret,label,center=cv2.kmeans(Z,K,None,criteria,10,cv2.KMEANS_RANDOM_CENTERS)
-
-        center = np.uint8(center)
-        res = center[label.flatten()]
-        res2 = res.reshape((image.shape))
-
-        return res2
+    @log_and_calc
+    def _crop_image(self, image):
+        if type(image) == dict:
+            return self._run_multiple(self._crop_image, image)
+        return preprocessing.crop_image(image, self._config.crop_coordinates)
 
     @log_and_calc
     def _resize(self, image):
-        scale_percent = 50 # percent of original size
-        width = int(image.shape[1] * scale_percent / 100)
-        height = int(image.shape[0] * scale_percent / 100)
-        dim = (width, height)
-        
-        # resize image
-        return cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
+        if type(image) == dict:
+            return self._run_multiple(self._crop_image, image)
+        return preprocessing.resize(image)
+
+    @log_and_calc
+    def _normalization(self, image):
+        if type(image) == dict:
+            return self._run_multiple(self._normalization, image)
+        norm_img = np.zeros((image.shape[0], image.shape[1]))
+        return cv2.normalize(image, norm_img, 0, 255, cv2.NORM_MINMAX)
+    
+    @log_and_calc
+    def _deskew(self, image):
+        if type(image) == dict:
+            return self._run_multiple(self._deskew, image)
+        co_ords = np.column_stack(np.where(image > 0))
+        angle = cv2.minAreaRect(co_ords)[-1]
+        if angle < -45:
+            angle = -(90 + angle)
+        else:
+            angle = -angle
+        (h, w) = image.shape[:2]
+        center = (w // 2, h // 2)
+        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        rotated = cv2.warpAffine(image, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+        return rotated
+    
+    @log_and_calc
+    def _thinning(self, image):
+        if type(image) == dict:
+            return self._run_multiple(self._thinning, image)
+        kernel = np.ones((5,5),np.uint8)
+        return cv2.erode(image, kernel, iterations = 1)
+    
+    @log_and_calc
+    def _remove_noise(self, image):
+        if type(image) == dict:
+            return self._run_multiple(self._remove_noise, image)
+        return cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 15)
+    
+    @log_and_calc
+    def _make_text_visible(self, image):
+        if type(image) == dict:
+            return self._run_multiple(self._make_text_visible, image)
+        # image = preprocessing.kmeans(image)
+        image = preprocessing.grayscale_image(image)
+        image = preprocessing.bilateral_filter(image)
+        return preprocessing.thresholding(image)
+    
+
+    

@@ -9,7 +9,8 @@ import logging
 import cv2
 
 from lib.config import Config
-from lib.utils import make_logger, make_image_processor
+from lib.utils import make_logger
+from lib.creator import make_image_processor
 
 log = None
 
@@ -41,7 +42,9 @@ def main():
     while translator.get_counter() == 0:
         sleep(0.1)
     result = translator.get_processed_data()
-    log.error('result="{}"'.format(result))
+    
+    if 'original_text' in result:
+        log.error(result['original_text'])
 
     translator.stop()
 

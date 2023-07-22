@@ -118,29 +118,25 @@ class AreaPatternAnalyzer(object):
         # loop over the bounding boxes
         boxes = self.make_bigger_blocks(boxes, W, H)
         boxes = self.get_lines(boxes)
-        for (startX, startY, endX, endY) in boxes:
+        for box in boxes:
             # scale the bounding box coordinates based on the respective
             # ratios
-            startX = int(startX * rW)
-            startY = int(startY * rH)
-            endX = int(endX * rW)
-            endY = int(endY * rH)
-            # new_boxes.append((startX, startY), (endX, endY))
-        # new_boxes = self.get_lines(new_boxes)
-            # draw the bounding box on the image
-            cv2.rectangle(image, (startX, startY), (endX, endY), (0, 255, 0), 2)
-        return image
+            box[0] = int(box[0] * rW)
+            box[1] = int(box[1] * rH)
+            box[2] = int(box[2] * rW)
+            box[3] = int(box[3] * rH)
+            # cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+        log.info(f'boxes={boxes}')
+        return {'image': image, 'boxes': boxes}
     
     def make_bigger_blocks(self, boxes, W, H):
-        log.error(f'before={boxes}')
         for box in boxes:
-            w = int((box[2] - box[0]) / 100.0 * 50)
-            h = int((box[3] - box[1]) / 100.0 * 50)
+            w = int(((box[2] - box[0]) / 100.0) * 50)
+            h = int(((box[3] - box[1]) / 100.0) * 50)
             box[0] = max(box[0] - w, 0)
             box[1] = max(box[1] - h, 0)
             box[2] = min(box[2] + w, W)
             box[3] = min(box[3] + h, H)
-        log.error(f'after={boxes}')
         return boxes
 
     def get_lines(self, boxes):
@@ -157,9 +153,26 @@ class AreaPatternAnalyzer(object):
                 boxes[i][2] = max(boxes[i][2], boxes[j][2])
                 boxes[i][3] = max(boxes[i][3], boxes[j][3])
                 boxes[j] = np.array([-1,-1,-1,-1])
-        boxes = boxes[~np.all(boxes == 0, axis=1)]
+        boxes = boxes[~np.all(boxes == -1, axis=1)]
         return boxes
-        
+    
+    def get_boxes_2(self, image):
+        pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
+        data_csv = pytesseract.image_to_data(image, config='--psm 12 --oem 1 -c tessedit_do_invert=0', output_type='string')
+        log.error(data_csv)
+        data_csv_lines = data_csv.splitlines()
+        csv_reader = csv.reader(data_csv_lines, delimiter='\t')
+        csv_reader.__next__() # skip head row
+        boxes = np.zeros((len()))
+        for row in csv_reader:
+            confidence = float(row[10])
+            if confidence > 90:
+                left = int(row[6])
+                top = int(row[7])
+                width = int(row[8])
+                height = int(row[9])
+                word_bounds = (left, top, left + width, top + height)
+                boxes.append()
 
     def pattern_analysis(self, image):
         for pattern in self._patterns:
