@@ -173,26 +173,23 @@ class AreaPatternAnalyzer(object):
     
     def get_boxes_2(self, image):
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
-        data_csv = pytesseract.image_to_data(image, config='--psm 12 --oem 1 -c tessedit_do_invert=0', output_type='string')
-        log.error(data_csv)
-        data_csv_lines = data_csv.splitlines()
-        csv_reader = csv.reader(data_csv_lines, delimiter='\t')
-        csv_reader.__next__() # skip head row
-        boxes = np.zeros((len(csv_reader), 4))
+        data = pytesseract.image_to_data(image, config='--psm 11 --oem 1 -c tessedit_do_invert=0', output_type=pytesseract.Output.DICT)
+        boxes = np.zeros((len(data), 4), dtype=np.uint32)
+        count = len(data['level'])
+        print(data)
         num = 0
-        for row in csv_reader:
-            confidence = float(row[10])
-            if confidence > 90:
-                left = int(row[6])
-                top = int(row[7])
-                width = int(row[8])
-                height = int(row[9])
-                word_bounds = (left, top, left + width, top + height)
-                boxes[num] = np.array([word_bounds[0], word_bounds[1], word_bounds[2], word_bounds[3]])
+        for i in range(count):
+            if float(data['conf'][i]) < 15.:
+                continue
+            x1 = int(data['left'][i])
+            y1 = int(data['top'][i])
+            x2 = int(data['width'][i]) + x1
+            y2 = int(data['height'][i]) + y1
+            boxes[num] = np.array([x1, y1, x2, y2])
         boxes = boxes[~np.all(boxes == 0, axis=1)]
         (H, W) = image.shape[:2]
         boxes = self.get_lines(boxes, W, H)
-        return boxes
+        return {'image': image, 'boxes': boxes}
 
     def pattern_analysis(self, image):
         for pattern in self._patterns:

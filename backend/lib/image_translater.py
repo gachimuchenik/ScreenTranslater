@@ -161,6 +161,26 @@ class ImageTranslater(object):
         return self._pattern_analyser.get_boxes(image)
     
     @log_and_calc
+    def _get_areas_tess(self, image):
+        prepared_image = self._grayscale(image)
+        prepared_image = self._remove_noise(prepared_image)
+        prepared_image = self._gaussian_blur(prepared_image)
+        prepared_image = self._adaptive_threshold(prepared_image)
+        # prepared_image = self._thinning(prepared_image)
+        result = self._pattern_analyser.get_boxes_2(prepared_image)
+        for box in result['boxes']:
+            cv2.rectangle(prepared_image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+        result['image'] = prepared_image
+        result['real_image'] = image
+        return result
+        
+    @log_and_calc
+    def _print_prepared_image(self, data):
+        data['image'] = data['real_image']
+        del data['real_image']
+        return data
+    
+    @log_and_calc
     def _crop_fields(self, data):
         image = data['image']
         boxes = data['boxes']
