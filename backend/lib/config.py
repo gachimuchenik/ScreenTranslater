@@ -26,8 +26,6 @@ class Config(object):
         self.max_buffer_length = max(config.getint('DataProcessor', 'max_buffer_length'), 1)
 
         # Preprocessing config
-        self.crop_coordinates = [int(x) for x in config.get(
-            'ImageProcessing', 'crop_coordinates').split(',')]
         self.grayscale_threshold = config.getint(
             'ImageProcessing', 'grayscale_threshold')
         self.transform_pipeline = config.get('ImageProcessing', 'pipeline').replace(' ', '').split(',')

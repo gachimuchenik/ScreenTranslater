@@ -8,7 +8,8 @@ import logging
 from flask import Flask
 
 from lib.config import Config
-from lib.utils import make_logger, make_image_processor
+from lib.utils import make_logger
+from lib.creator import make_image_processor
 
 app = Flask(__name__)
 log = None

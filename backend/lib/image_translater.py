@@ -15,25 +15,14 @@ from googletrans import Translator as GoogleTranslator
 import cv2
 import numpy as np
 from lib.area_pattern_analyzer import AreaPatternAnalyzer
-from lib.data_saver import save_image
+from lib.data_saver import save_data
 from lib.area_pattern_analyzer import AreaPatternAnalyzer
+from lib.utils import log_and_calc
+import lib.preprocessing as preprocessing
 
 log = logging.getLogger(__name__)
 
 class ImageTranslater(object):
-    def log_and_calc(func):
-        @functools.wraps(func)
-        def impl(self, *args, **kwargs):
-            log.info('{} Start'.format(func.__name__))
-            log.debug('{} Args={}'.format(func.__name__, *args))
-            start = time.time()
-            result = func(self, *args, **kwargs)
-            end = time.time()
-            log.info('{} Complete in {}ms'.format(
-                func.__name__, int((end - start) * 1000)))
-            return result
-        return impl
-
     def __init__(self, config):
         self._translator = GoogleTranslator()
         self._config = config
@@ -51,11 +40,13 @@ class ImageTranslater(object):
         return getattr(self, name)(*args)
 
     def run_pipeline(self, data):
+        step = 0
         for node in self._config.transform_pipeline:
+            step += 1
             data = self.call_method(f'_{node}', data)
             if not self._config.log_images:
                 continue
-            save_image(data, os.path.join(self._config.log_path, str(self._id), node + '.png'))
+            save_data(data, os.path.join(self._config.log_path, str(self._id)), f'step{step}_' + node)
         return data
 
     @log_and_calc
@@ -72,6 +63,8 @@ class ImageTranslater(object):
 
     @log_and_calc
     def _crunch_after_recognize(self, text):
+        if type(text) == dict:
+            return self._run_multiple_data(self._crunch_after_recognize, text, 'original_text', 'original_text')
         text = text.replace(' | ', ' I ')
         text = text.replace('  ', ' ')
         text = text.replace('(A)', '')
@@ -102,6 +95,8 @@ class ImageTranslater(object):
         :param image: input image
         :return: founded text
         """ 
+        if type(image) == dict:
+            return self._run_multiple_data(self._recognize_text, image, 'images', 'original_text')
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
         input_text = pytesseract.image_to_string(
             image, config=self._config.tesseract_custom_conf, output_type='string')
@@ -112,12 +107,15 @@ class ImageTranslater(object):
     # out: text
     @log_and_calc
     def _recognize_text_from_tesseract_data(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._recognize_text_from_tesseract_data, image, 'images', 'original_text')
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
         data_csv = pytesseract.image_to_data(image, config=self._config.tesseract_custom_conf, output_type='string')
         data_csv_lines = data_csv.splitlines()
         csv_reader = csv.reader(data_csv_lines, delimiter='\t')
         csv_reader.__next__() # skip head row
         input_text = ''
+        log.info(data_csv_lines)
         for row in csv_reader:
             confidence = float(row[10])
             text = row[11]
@@ -131,84 +129,122 @@ class ImageTranslater(object):
         :param text: input text
         :return: translated text
         """ 
+        if type(text) == dict:
+            return self._run_multiple_data(self._translate_text, text, 'original_text', 'translated_text')
         translated_text = None
         try:
             translated = self._translator.translate(text, dest='ru')
             translated_text = translated.text
         except Exception as e:
             log.exception(e)
-        result = {'en': text, 'ru': translated_text}
-        return result
-
-    @log_and_calc
-    def _crop_image(self, image):
-        """ Crop area from image
-        :param image: input image
-        :return: cropped image
-        """ 
-        x1 = self._config.crop_coordinates[0]
-        x2 = self._config.crop_coordinates[2]
-        y1 = self._config.crop_coordinates[1]
-        y2 = self._config.crop_coordinates[3]
-        return image[y1:y2, x1:x2]
+        return translated_text
     
     @log_and_calc
-    def _grayscale_image(self, image):
-        return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
-    @log_and_calc
-    def _denoiser(self, image):
-        return cv2.medianBlur(image, 3)
-    
-    @log_and_calc
-    def _gaussian_blur(self, image):
-        return cv2.GaussianBlur(image, (3,3), 0)
-    
-    @log_and_calc
-    def _bilateral_filter(self, image):
-        return cv2.bilateralFilter(image, 3, 75, 75)
-    
-    @log_and_calc
-    def _thresholding(self, image):
-        return cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 101, -100)
-        # return cv2.threshold(image, 200, 255, cv2.THRESH_BINARY)[1]
-        
+    def _run_multiple_data(self, function, data, input_field='images', output_field='images'):
+        result = []
+        for obj in data[input_field]:
+            obj = function(obj)
+            if type(obj) == str:
+                log.info(f'{function.__name__} result {obj}')
+            result.append(obj)
+        data[output_field] = result
+        return data
 
     @log_and_calc
     def _pattern_analysis(self, image):
         test = AreaPatternAnalyzer(self._config)
         log.info(test.pattern_analysis(image))
         return image
-
+    
     @log_and_calc
     def _get_areas(self, image):
         return self._pattern_analyser.get_boxes(image)
-
-    @log_and_calc
-    def _canny(self, image):
-        return cv2.Canny(image=image, threshold1=100, threshold2=200) 
     
     @log_and_calc
-    def _kmeans(self, image):
-        Z = image.reshape((-1,3))
-        Z = np.float32(Z)
-
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-        K = 4
-        ret,label,center=cv2.kmeans(Z,K,None,criteria,10,cv2.KMEANS_RANDOM_CENTERS)
-
-        center = np.uint8(center)
-        res = center[label.flatten()]
-        res2 = res.reshape((image.shape))
-
-        return res2
+    def _crop_fields(self, data):
+        image = data['image']
+        boxes = data['boxes']
+        result = {'boxes': [], 'images': [], 'original_image': image}
+        for box in boxes:
+            result['boxes'].append(box)
+            result['images'].append(preprocessing.crop_image(image, box))
+        return result
 
     @log_and_calc
     def _resize(self, image):
-        scale_percent = 50 # percent of original size
-        width = int(image.shape[1] * scale_percent / 100)
-        height = int(image.shape[0] * scale_percent / 100)
-        dim = (width, height)
-        
-        # resize image
-        return cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
+        if type(image) == dict:
+            return self._run_multiple_data(self._crop_image, image)
+        return preprocessing.resize(image)
+
+    @log_and_calc
+    def _normalization(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._normalization, image)
+        norm_img = np.zeros((image.shape[0], image.shape[1]))
+        return cv2.normalize(image, norm_img, 0, 255, cv2.NORM_MINMAX)
+    
+    @log_and_calc
+    def _deskew(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._deskew, image)
+        co_ords = np.column_stack(np.where(image > 0))
+        angle = cv2.minAreaRect(co_ords)[-1]
+        if angle < -45:
+            angle = -(90 + angle)
+        else:
+            angle = -angle
+        (h, w) = image.shape[:2]
+        center = (w // 2, h // 2)
+        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        rotated = cv2.warpAffine(image, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+        return rotated
+    
+    @log_and_calc
+    def _thinning(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._thinning, image)
+        kernel = np.ones((3,3),np.uint8)
+        return cv2.erode(image, kernel, iterations = 1)
+    
+    @log_and_calc
+    def _remove_noise_colored(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._remove_noise, image)
+        return cv2.fastNlMeansDenoisingColored(image, None, 15, 10, 21, 7)
+
+    @log_and_calc
+    def _remove_noise(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._remove_noise, image)
+        # return cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 15)
+        return cv2.fastNlMeansDenoising(image, None, 10, 7, 15)
+    
+
+    @log_and_calc
+    def _threshold(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._threshold, image)
+        return preprocessing.threshold(image)
+
+
+    @log_and_calc
+    def _adaptive_threshold(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._adaptive_threshold, image)
+        return preprocessing.adaptive_threshold(image)
+
+    @log_and_calc
+    def _grayscale(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._grayscale, image)
+        return preprocessing.grayscale_image(image)
+    
+    @log_and_calc
+    def _gaussian_blur(self, image):
+        if type(image) == dict:
+            return self._run_multiple_data(self._gaussian_blur, image)
+        return preprocessing.gaussian_blur(image)
+
+    
+
+    

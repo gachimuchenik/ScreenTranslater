@@ -6,15 +6,25 @@ from pathlib import Path
 import shutil
 import sys
 import os
+import time
 import numpy as np
 import cv2
-
-from lib.processor import Processor
-from lib.image_getter_clipboard import ImageGetterClipboard
-from lib.image_getter_folder import ImageGetterFolder
-from lib.image_translater import ImageTranslater
+import functools
 
 log = logging.getLogger()
+
+def log_and_calc(func):
+    @functools.wraps(func)
+    def impl(self, *args, **kwargs):
+        log.info('{} Start'.format(func.__name__))
+        log.debug('{} Args={}'.format(func.__name__, *args))
+        start = time.time()
+        result = func(self, *args, **kwargs)
+        end = time.time()
+        log.info('{} Complete in {}ms'.format(
+            func.__name__, int((end - start) * 1000)))
+        return result
+    return impl
 
 def try_delete(path):
     try:
@@ -73,14 +83,3 @@ def make_logger(config):
 
         log.addHandler(err_handler)
         log.addHandler(handler)
-
-
-def make_image_getter(config):
-    if config.data_getter_type == 'clipboard':
-        return ImageGetterClipboard(config.use_fake_image_getter)
-    elif config.data_getter_type == 'folder':
-        return ImageGetterFolder(config.getter_folder_path)
-    raise RuntimeError(f'Unknown Data Getter type: {config.data_getter_type}')
-
-def make_image_processor(config):
-    return Processor(config, make_image_getter(config), ImageTranslater(config))

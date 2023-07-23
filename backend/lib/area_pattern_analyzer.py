@@ -116,46 +116,78 @@ class AreaPatternAnalyzer(object):
             # boxes
         boxes = non_max_suppression(np.array(rects), probs=confidences)
         # loop over the bounding boxes
-        log.error(f'boxes_len={len(boxes)}')
-        new_boxes = self.get_lines(H, boxes)
-        log.error(f'new_boxes_len={len(new_boxes)}')
-        for (startX, startY, endX, endY) in new_boxes:
+        # boxes = self.make_bigger_blocks(boxes, W, H)
+        boxes = self.get_lines(boxes, W, H)
+        for box in boxes:
             # scale the bounding box coordinates based on the respective
             # ratios
-            startX = int(startX * rW)
-            startY = int(startY * rH)
-            endX = int(endX * rW)
-            endY = int(endY * rH)
-            # new_boxes.append((startX, startY), (endX, endY))
-        # new_boxes = self.get_lines(new_boxes)
-            # draw the bounding box on the image
-            cv2.rectangle(image, (startX, startY), (endX, endY), (0, 255, 0), 2)
-        return image
+            box[0] = int(box[0] * rW)
+            box[1] = int(box[1] * rH)
+            box[2] = int(box[2] * rW)
+            box[3] = int(box[3] * rH)
+            cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+        log.info(f'boxes={boxes}')
+        return {'image': image, 'boxes': boxes}
+    
+    def make_block_bigger(self, box, W, H, perc):
+        newBox = np.array([0,0,0,0])
+        w = int(((box[2] - box[0]) / 100.0) * perc)
+        h = int(((box[3] - box[1]) / 100.0) * perc)
+        newBox[0] = max(box[0] - w, 0)
+        newBox[1] = max(box[1] - h, 0)
+        newBox[2] = min(box[2] + w, W)
+        newBox[3] = min(box[3] + h, H)
+        return newBox
 
-    def get_lines(self, H, boxes):
-        new_boxes = np.empty_like(boxes)
-        for i in range(H):
-            new_box = None
-            for box in boxes:
-                # log.error(f'{box}')
-                if i < box[1] or i > box[3]:
+    def combine_boxes(self, box1, box2):
+        box1[0] = min(box1[0], box2[0])
+        box1[1] = min(box1[1], box2[1])
+        box1[2] = max(box1[2], box2[2])
+        box1[3] = max(box1[3], box2[3])
+        return box1
+
+    def get_lines(self, boxes, W, H):
+        for it in range(3):
+            for i in range(len(boxes)):
+                first_box = self.make_block_bigger(boxes[i], W, H, 50)
+                if first_box[0] == -1 and first_box[1] == -1 and first_box[2] == -1 and first_box[3] == -1:
                     continue
-                # log.error(f' {i} found {box}')
-                if new_box is None:
-                    new_box = box
-                else:
-                    new_box[0] = min(new_box[0], box[0])
-                    new_box[1] = min(new_box[1], box[1])
-                    new_box[2] = max(new_box[2], box[2])
-                    new_box[3] = max(new_box[3], box[3])
-            # print(f'new_box={new_box}')
-            if new_box is not None:
-                np.append(new_boxes, new_box)
-                print(f'new_boxes={new_boxes}')
-        new_boxes = np.unique(new_boxes) # im just a lazy guy
-        # print(f'unique_new_boxes={new_boxes}')
-        return new_boxes
-        
+                for j in range(i+1, len(boxes)):
+                    second_box = self.make_block_bigger(boxes[j], W, H, 50)
+                    if second_box[0] == -1 and second_box[1] == -1 and second_box[2] == -1 and second_box[3] == -1:
+                        continue
+                    if first_box[3] < second_box[1] or first_box[1] > second_box[3]:
+                        continue
+                    boxes[i] = self.combine_boxes(boxes[i], boxes[j])
+                    first_box = self.combine_boxes(first_box, second_box)
+                    boxes[j] = np.array([-1,-1,-1,-1])
+            boxes = boxes[~np.all(boxes == -1, axis=1)]
+            boxes = np.unique(boxes, axis=0)
+
+        for i in range(len(boxes)):
+            boxes[i][0] -= 2
+            boxes[i][1] -= 2
+            boxes[i][2] += 2
+            boxes[i][3] += 2
+        return boxes
+    
+    def get_boxes_2(self, image):
+        pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
+        data_csv = pytesseract.image_to_data(image, config='--psm 12 --oem 1 -c tessedit_do_invert=0', output_type='string')
+        log.error(data_csv)
+        data_csv_lines = data_csv.splitlines()
+        csv_reader = csv.reader(data_csv_lines, delimiter='\t')
+        csv_reader.__next__() # skip head row
+        boxes = np.zeros((len()))
+        for row in csv_reader:
+            confidence = float(row[10])
+            if confidence > 90:
+                left = int(row[6])
+                top = int(row[7])
+                width = int(row[8])
+                height = int(row[9])
+                word_bounds = (left, top, left + width, top + height)
+                boxes.append()
 
     def pattern_analysis(self, image):
         for pattern in self._patterns:
