@@ -34,7 +34,6 @@ class AreaPattern(object):
 class AreaPatternAnalyzer(object):
     def __init__(self, config):
         self._config = config
-        self.net = cv2.dnn.readNet(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'frozen_east_text_detection.pb'))
         
         self._patterns = [
             AreaPattern('gameplay dialog', [
@@ -52,143 +51,122 @@ class AreaPatternAnalyzer(object):
                 ]),
         ]
     
-    def get_boxes(self, image):
-        layerNames = [
-            "feature_fusion/Conv_7/Sigmoid",
-            "feature_fusion/concat_3"]
-        (H, W) = image.shape[:2]
-
-        newW = 320
-        newH = 320
-        rW = W / float(newW)
-        rH = H / float(newH)
-        resized = cv2.resize(image, (newW, newH))
-        (H, W) = resized.shape[:2]
-
-        blob = cv2.dnn.blobFromImage(resized, 1.0, (W, H), (123.68, 116.78, 103.94), swapRB=True, crop=False)
-        start = time.time()
-        self.net.setInput(blob)
-        (scores, geometry) = self.net.forward(layerNames)
-        end = time.time()
-
-        (numRows, numCols) = scores.shape[2:4]
-        rects = []
-        confidences = []
-        # loop over the number of rows
-        for y in range(0, numRows):
-            # extract the scores (probabilities), followed by the geometrical
-            # data used to derive potential bounding box coordinates that
-            # surround text
-            scoresData = scores[0, 0, y]
-            xData0 = geometry[0, 0, y]
-            xData1 = geometry[0, 1, y]
-            xData2 = geometry[0, 2, y]
-            xData3 = geometry[0, 3, y]
-            anglesData = geometry[0, 4, y]
-            	# loop over the number of columns
-            for x in range(0, numCols):
-                # if our score does not have sufficient probability, ignore it
-                if scoresData[x] < 0.5:
-                    continue
-                # compute the offset factor as our resulting feature maps will
-                # be 4x smaller than the input image
-                (offsetX, offsetY) = (x * 4.0, y * 4.0)
-                # extract the rotation angle for the prediction and then
-                # compute the sin and cosine
-                angle = anglesData[x]
-                cos = np.cos(angle)
-                sin = np.sin(angle)
-                # use the geometry volume to derive the width and height of
-                # the bounding box
-                h = xData0[x] + xData2[x]
-                w = xData1[x] + xData3[x]
-                # compute both the starting and ending (x, y)-coordinates for
-                # the text prediction bounding box
-                endX = int(offsetX + (cos * xData1[x]) + (sin * xData2[x]))
-                endY = int(offsetY - (sin * xData1[x]) + (cos * xData2[x]))
-                startX = int(endX - w)
-                startY = int(endY - h)
-                # add the bounding box coordinates and probability score to
-                # our respective lists
-                rects.append((startX, startY, endX, endY))
-                confidences.append(scoresData[x])
-            # apply non-maxima suppression to suppress weak, overlapping bounding
-            # boxes
-        boxes = non_max_suppression(np.array(rects), probs=confidences)
-        # loop over the bounding boxes
-        # boxes = self.make_bigger_blocks(boxes, W, H)
-        boxes = self.get_lines(boxes, W, H)
-        for box in boxes:
-            # scale the bounding box coordinates based on the respective
-            # ratios
-            box[0] = int(box[0] * rW)
-            box[1] = int(box[1] * rH)
-            box[2] = int(box[2] * rW)
-            box[3] = int(box[3] * rH)
-            cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
-        log.info(f'boxes={boxes}')
-        return {'image': image, 'boxes': boxes}
-    
     def make_block_bigger(self, box, W, H, perc):
         newBox = np.array([0,0,0,0])
         w = int(((box[2] - box[0]) / 100.0) * perc)
         h = int(((box[3] - box[1]) / 100.0) * perc)
-        newBox[0] = max(box[0] - w, 0)
-        newBox[1] = max(box[1] - h, 0)
-        newBox[2] = min(box[2] + w, W)
-        newBox[3] = min(box[3] + h, H)
+        minVal = min(w, h)
+        newBox[0] = max(box[0] - minVal, 0)
+        newBox[1] = max(box[1] - minVal, 0)
+        newBox[2] = min(box[2] + minVal, W)
+        newBox[3] = min(box[3] + minVal, H)
         return newBox
 
     def combine_boxes(self, box1, box2):
-        box1[0] = min(box1[0], box2[0])
-        box1[1] = min(box1[1], box2[1])
-        box1[2] = max(box1[2], box2[2])
-        box1[3] = max(box1[3], box2[3])
-        return box1
-
-    def get_lines(self, boxes, W, H):
-        for it in range(3):
-            for i in range(len(boxes)):
-                first_box = self.make_block_bigger(boxes[i], W, H, 50)
-                if first_box[0] == -1 and first_box[1] == -1 and first_box[2] == -1 and first_box[3] == -1:
-                    continue
-                for j in range(i+1, len(boxes)):
-                    second_box = self.make_block_bigger(boxes[j], W, H, 50)
-                    if second_box[0] == -1 and second_box[1] == -1 and second_box[2] == -1 and second_box[3] == -1:
-                        continue
-                    if first_box[3] < second_box[1] or first_box[1] > second_box[3]:
-                        continue
-                    boxes[i] = self.combine_boxes(boxes[i], boxes[j])
-                    first_box = self.combine_boxes(first_box, second_box)
-                    boxes[j] = np.array([-1,-1,-1,-1])
-            boxes = boxes[~np.all(boxes == -1, axis=1)]
-            boxes = np.unique(boxes, axis=0)
-
-        for i in range(len(boxes)):
-            boxes[i][0] -= 2
-            boxes[i][1] -= 2
-            boxes[i][2] += 2
-            boxes[i][3] += 2
-        return boxes
+        return (min(box1[0], box2[0]), min(box1[1], box2[1]), max(box1[2], box2[2]), max(box1[3], box2[3]))
     
+    def get_real_lines(self, boxes, W, H):
+        # join horizontally
+        boxes = boxes[np.argsort(boxes[:, 0])]
+        for i in range(len(boxes)):
+            if boxes[i][0] == -1:
+                continue
+            for j in range(i+1, len(boxes)):
+                if boxes[j][0] == -1:
+                    continue 
+                if boxes[i][3] < boxes[j][1] or boxes[i][1] > boxes[j][3]: 
+                    continue
+                icx = ((boxes[i][2] - boxes[i][0]) / 2) + boxes[i][0]
+                jcx = ((boxes[j][2] - boxes[j][0]) / 2) + boxes[j][0]
+                if icx > jcx:
+                    if boxes[i][0] - boxes[j][2] >  W / 10:
+                        continue
+                if jcx > icx:
+                    if boxes[j][0] - boxes[i][2] > W / 10:
+                        continue
+                boxes[i] = self.combine_boxes(boxes[i], boxes[j])
+                boxes[j] = np.array([-1,-1,-1,-1])
+        boxes = boxes[~np.all(boxes == -1, axis=1)]
+        boxes = np.unique(boxes, axis=0)
+
+        # join vertically
+        boxes = boxes[np.argsort(boxes[:, 1])]
+        for i in range(len(boxes)):
+            if boxes[i][1] == -1:
+                continue
+            diff = (boxes[i][3] - boxes[i][1]) * 0.8
+            for j in range(i+1, len(boxes)):
+                if boxes[j][0] == 0:
+                    continue
+                if boxes[i][2] < boxes[j][0] or boxes[i][0] > boxes[j][2]: 
+                    continue
+                if boxes[i][3] + diff < boxes[j][1]:
+                    continue
+                boxes[i] = self.combine_boxes(boxes[i], boxes[j])
+                boxes[j] = np.array([-1,-1,-1,-1])
+        boxes = boxes[~np.all(boxes == -1, axis=1)]
+        boxes = np.unique(boxes, axis=0)
+        return boxes
+
+    def remove_small_boxes(self, boxes, W, H, threshold_perc = 0.01):
+        wthresh = W * threshold_perc
+        hthresh = H * threshold_perc
+        for i in range(len(boxes)):
+            box = boxes[i]
+            if box[2] - box[0] < wthresh or box[3] - box[1] < hthresh:
+                boxes[i] = (0, 0, 0, 0)
+        boxes = boxes[~np.all(boxes == 0, axis=1)]
+        return boxes
+
+    def detectSWTandTransform(self, image, dark_on_light, chainBBs=None):
+        boxes, draw, chainBBs = cv2.text.detectTextSWT(image, dark_on_light, chainBBs=chainBBs)
+        for i in range(len(boxes)):
+            boxes[i][2] = boxes[i][0] + boxes[i][2]
+            boxes[i][3] = boxes[i][1] + boxes[i][3]
+        return boxes
+
+    def stroke_widths_transform(self, image, chainBBs=None):
+        (H, W) = image.shape[:2]
+        boxes = self.detectSWTandTransform(image, True, chainBBs)
+        boxes2 = self.detectSWTandTransform(image, False, chainBBs)
+
+        if len(boxes) == 0:
+            boxes = boxes2
+        elif len(boxes2) != 0:
+            boxes = np.concatenate((boxes, boxes2))
+
+        boxes = self.get_real_lines(boxes, W, H)
+        boxes = self.remove_small_boxes(boxes, W, H, 0.015)
+        for i in range(len(boxes)):
+            boxes[i] = self.make_block_bigger(boxes[i], W, H, 15)
+
+        return boxes
+        
     def get_boxes_2(self, image):
+        (H, W) = image.shape[:2]
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
-        data = pytesseract.image_to_data(image, config='--psm 11 --oem 1 -c tessedit_do_invert=0', output_type=pytesseract.Output.DICT)
-        boxes = np.zeros((len(data), 4), dtype=np.uint32)
+        # data = pytesseract.image_to_data(resized, config='--psm 11 --oem 1 -c tessedit_do_invert=0 -c tessedit_char_whitelist={}'.format('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'), output_type=pytesseract.Output.DICT)
+        data = pytesseract.image_to_data(image, config='--psm 6 --oem 1 -c tessedit_do_invert=0', output_type=pytesseract.Output.DICT)
         count = len(data['level'])
-        print(data)
+        boxes = np.zeros((count, 4), dtype=np.int32)
+        confs = np.zeros((count))
         num = 0
         for i in range(count):
-            if float(data['conf'][i]) < 15.:
-                continue
+            conf = float(data['conf'][i])
             x1 = int(data['left'][i])
             y1 = int(data['top'][i])
-            x2 = int(data['width'][i]) + x1
-            y2 = int(data['height'][i]) + y1
-            boxes[num] = np.array([x1, y1, x2, y2])
+            x2 = (int(data['width'][i]) + x1)
+            y2 = (int(data['height'][i]) + y1)
+            word = data['text'][i]
+            if conf < 95.:
+                continue
+            boxes[i] = self.make_block_bigger(np.array([x1, y1, x2, y2]), W, H, 1)
+            confs[i] = conf
+            num += 1
         boxes = boxes[~np.all(boxes == 0, axis=1)]
-        (H, W) = image.shape[:2]
-        boxes = self.get_lines(boxes, W, H)
+        confs = confs[confs != 0]
+        boxes = self.get_real_lines(boxes, W, H)
+        boxes = self.remove_small_boxes(boxes, W, H, 0.015)
         return {'image': image, 'boxes': boxes}
 
     def pattern_analysis(self, image):

@@ -21,7 +21,6 @@ class ImageGetterFolder(object):
                 log.info(f'readed file: {entry.name}')
                 yield cv2.imread(entry.path)
         log.info('Folder readed complete')
-        print('Folder readed complete')
         self._done = True
         yield None
 

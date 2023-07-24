@@ -43,8 +43,11 @@ def main():
         sleep(0.1)
     result = translator.get_processed_data()
     
-    print(result['original_text'])
-    print(result['translated_text'])
+    try:
+        print(result['original_text'])
+        print(result['translated_text'])
+    except Exception:
+        pass
 
     translator.stop()
 

@@ -19,14 +19,14 @@ def grayscale_image(image):
 def denoiser(image):
     return cv2.medianBlur(image, 3)
 
-def gaussian_blur(image):
-    return cv2.GaussianBlur(image, (3,3), 0)
+def gaussian_blur(image, ksize=(3,3), sigmaX=0):
+    return cv2.GaussianBlur(image, ksize, sigmaX)
 
 def bilateral_filter(image):
     return cv2.bilateralFilter(image, 3, 75, 75)
 
-def adaptive_threshold(image):
-    return cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, -7)
+def adaptive_threshold(image, threshold=255, v1=11, v2=-7):
+    return cv2.adaptiveThreshold(image, threshold, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, v1, v2)
 
 def threshold(image):
     return cv2.threshold(image, 180, 255, cv2.THRESH_BINARY_INV) [1]
@@ -48,8 +48,7 @@ def kmeans(image):
 
     return res2
 
-def resize(image):
-    scale_percent = 50 # percent of original size
+def resize(image, scale_percent):
     width = int(image.shape[1] * scale_percent / 100)
     height = int(image.shape[0] * scale_percent / 100)
     dim = (width, height)
