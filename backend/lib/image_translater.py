@@ -30,6 +30,7 @@ class ImageTranslater(object):
         self._id = 0
         self._spellcheck = SpellChecker(distance=1)  
         self._pattern_analyser = AreaPatternAnalyzer(config)
+        # self._tesseract = cv2.text.OCRTesseract.create(datapath='/usr/bin/', psmode=cv2.text.PSM_SINGLE_BLOCK, oem=cv2.text.OEM_DEFAULT)
         # self._spellcheck.word_frequency.load_text_file(os.path.dirname(__file__), "frequency_dictionary_en_82_765.txt")
         # self._sym_spell = SymSpell(max_dictionary_edit_distance=1, prefix_length=4)
         # dictionary_path = os.path.join(os.path.dirname(__file__), "frequency_dictionary_en_82_765.txt")
@@ -103,25 +104,45 @@ class ImageTranslater(object):
         input_text = input_text.replace('\n', ' ')
         return input_text
 
+    # @log_and_calc
+    # def _opencv_tesseract(self, image):
+    #     if type(image) == dict:
+    #         return self._run_multiple_data(self._opencv_tesseract, image, 'images', 'original_text')
+    #     data = self._tesseract.run(image, 30, cv2.text.OCR_LEVEL_TEXTLINE)
+    #     print(data)
+    #     return data
+    #     # for i in range(len(data[]))
+        
     # in: image
     # out: text
     @log_and_calc
     def _recognize_text_from_tesseract_data(self, image):
         if type(image) == dict:
             return self._run_multiple_data(self._recognize_text_from_tesseract_data, image, 'images', 'original_text')
+        image = preprocessing.resize(image, 400)
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
-        data_csv = pytesseract.image_to_data(image, config=self._config.tesseract_custom_conf, output_type='string')
-        data_csv_lines = data_csv.splitlines()
-        csv_reader = csv.reader(data_csv_lines, delimiter='\t')
-        csv_reader.__next__() # skip head row
-        input_text = ''
-        log.info(data_csv_lines)
-        for row in csv_reader:
-            confidence = float(row[10])
-            text = row[11]
-            if confidence > 15:
-                input_text += text + ' '
-        return input_text
+        data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+        # data = pytesseract.run_and_get_output(image, extension='txt', config=self._config.tesseract_custom_conf, nice=1)
+        # print(data)
+        # return data
+        count = len(data['level'])
+        result = ''
+        found_something = False
+        for i in range(count):
+            confidence = float(data['conf'][i])
+            if confidence > 70:
+                found_something = True
+                break
+        if not found_something:
+            return ''
+        # если в блоке уже что-то нашли, считаем, что можно уменьшить confidence
+        for i in range(count):
+            confidence = float(data['conf'][i])
+            text = data['text'][i]
+            print(f'{confidence} - \'{text}\'')
+            if confidence > 30:
+                result += text + ' '
+        return result
 
     @log_and_calc
     def _translate_text(self, text):
@@ -132,6 +153,8 @@ class ImageTranslater(object):
         if type(text) == dict:
             return self._run_multiple_data(self._translate_text, text, 'original_text', 'translated_text')
         translated_text = None
+        if not text:
+            return None
         try:
             translated = self._translator.translate(text, dest='ru')
             translated_text = translated.text
@@ -145,7 +168,7 @@ class ImageTranslater(object):
         for obj in data[input_field]:
             obj = function(obj)
             if type(obj) == str:
-                log.info(f'{function.__name__} result {obj}')
+                log.debug(f'{function.__name__} result {obj}')
             result.append(obj)
         data[output_field] = result
         return data
@@ -158,7 +181,46 @@ class ImageTranslater(object):
     
     @log_and_calc
     def _get_areas(self, image):
-        return self._pattern_analyser.get_boxes(image)
+        prepared_image = preprocessing.gaussian_blur(image, (5,5), 0)
+        prepared_image = self._remove_noise(prepared_image)
+        prepared_image = preprocessing.adaptive_threshold(prepared_image, 255, 101, -220)
+        prepared_image = self._thinning(prepared_image)
+        result = self._pattern_analyser.get_boxes(prepared_image)
+        result['image'] = prepared_image
+        result['real_image'] = image
+        return result
+    
+    @log_and_calc
+    def _stroke_width_transform(self, image):
+        # image = preprocessing.gaussian_blur(image, (3,3), 1)
+        image = self._remove_noise_colored(image)
+        boxes = self._pattern_analyser.stroke_widths_transform(image)
+        result = {'image': image, 'boxes': boxes}
+        for box in result['boxes']:
+            cv2.rectangle(result['image'], (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+        return result
+
+    @log_and_calc
+    def _get_areas_tess(self, image):
+        prepared_image = preprocessing.resize(image, 200)
+        prepared_image = self._remove_noise_colored(prepared_image)
+        prepared_image = self._grayscale(prepared_image)
+        prepared_image = self._gaussian_blur(prepared_image)
+        prepared_image = preprocessing.adaptive_threshold(prepared_image)
+        prepared_image = self._gaussian_blur(prepared_image)
+        result = self._pattern_analyser.get_boxes_2(image)
+        for box in result['boxes']:
+            cv2.rectangle(result['image'], (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+        result['real_image'] = image
+        return result
+        
+    @log_and_calc
+    def _print_prepared_image(self, data):
+        data['image'] = data['real_image']
+        del data['real_image']
+        for box in data['boxes']:
+            cv2.rectangle(data['image'], (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+        return data
     
     @log_and_calc
     def _crop_fields(self, data):
@@ -217,7 +279,7 @@ class ImageTranslater(object):
         if type(image) == dict:
             return self._run_multiple_data(self._remove_noise, image)
         # return cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 15)
-        return cv2.fastNlMeansDenoising(image, None, 10, 7, 15)
+        return cv2.fastNlMeansDenoising(image, None, 15, 21, 7)
     
 
     @log_and_calc
