@@ -30,6 +30,7 @@ class ImageTranslater(object):
         self._id = 0
         self._spellcheck = SpellChecker(distance=1)  
         self._pattern_analyser = AreaPatternAnalyzer(config)
+        # self._tesseract = cv2.text.OCRTesseract.create(datapath='/usr/bin/', psmode=cv2.text.PSM_SINGLE_BLOCK, oem=cv2.text.OEM_DEFAULT)
         # self._spellcheck.word_frequency.load_text_file(os.path.dirname(__file__), "frequency_dictionary_en_82_765.txt")
         # self._sym_spell = SymSpell(max_dictionary_edit_distance=1, prefix_length=4)
         # dictionary_path = os.path.join(os.path.dirname(__file__), "frequency_dictionary_en_82_765.txt")
@@ -103,14 +104,27 @@ class ImageTranslater(object):
         input_text = input_text.replace('\n', ' ')
         return input_text
 
+    # @log_and_calc
+    # def _opencv_tesseract(self, image):
+    #     if type(image) == dict:
+    #         return self._run_multiple_data(self._opencv_tesseract, image, 'images', 'original_text')
+    #     data = self._tesseract.run(image, 30, cv2.text.OCR_LEVEL_TEXTLINE)
+    #     print(data)
+    #     return data
+    #     # for i in range(len(data[]))
+        
     # in: image
     # out: text
     @log_and_calc
     def _recognize_text_from_tesseract_data(self, image):
         if type(image) == dict:
             return self._run_multiple_data(self._recognize_text_from_tesseract_data, image, 'images', 'original_text')
+        image = preprocessing.resize(image, 400)
         pytesseract.pytesseract.tesseract_cmd = self._config.tesseract_path
-        data = pytesseract.image_to_data(image, config=self._config.tesseract_custom_conf, output_type=pytesseract.Output.DICT)
+        data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+        # data = pytesseract.run_and_get_output(image, extension='txt', config=self._config.tesseract_custom_conf, nice=1)
+        # print(data)
+        # return data
         count = len(data['level'])
         result = ''
         found_something = False
@@ -178,9 +192,12 @@ class ImageTranslater(object):
     
     @log_and_calc
     def _stroke_width_transform(self, image):
-        image = preprocessing.gaussian_blur(image, (3,3), 0)
+        # image = preprocessing.gaussian_blur(image, (3,3), 1)
+        image = self._remove_noise_colored(image)
         boxes = self._pattern_analyser.stroke_widths_transform(image)
         result = {'image': image, 'boxes': boxes}
+        for box in result['boxes']:
+            cv2.rectangle(result['image'], (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
         return result
 
     @log_and_calc

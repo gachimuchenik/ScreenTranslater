@@ -53,8 +53,10 @@ class AreaPatternAnalyzer(object):
     
     def make_block_bigger(self, box, W, H, perc):
         newBox = np.array([0,0,0,0])
-        w = int(((box[2] - box[0]) / 100.0) * perc)
-        h = int(((box[3] - box[1]) / 100.0) * perc)
+        # w = int(((box[2] - box[0]) / 100.0) * perc)
+        # h = int(((box[3] - box[1]) / 100.0) * perc)
+        w = W * perc
+        h = H * perc
         minVal = min(w, h)
         newBox[0] = max(box[0] - minVal, 0)
         newBox[1] = max(box[1] - minVal, 0)
@@ -138,7 +140,7 @@ class AreaPatternAnalyzer(object):
         boxes = self.get_real_lines(boxes, W, H)
         boxes = self.remove_small_boxes(boxes, W, H, 0.015)
         for i in range(len(boxes)):
-            boxes[i] = self.make_block_bigger(boxes[i], W, H, 15)
+            boxes[i] = self.make_block_bigger(boxes[i], W, H, 0.015)
 
         return boxes
         
